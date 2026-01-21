@@ -1,3 +1,6 @@
+.vs/
+.vscode/
+
 # Build artifacts and temporary files
 dist/
 dist-*/
@@ -130,3 +133,13 @@ build/
 .bak
 .mtc
 build/
+
+*.zip
+
+# auto-generated
+*.auto
+src/Frontend/Lexer.hs
+src/Frontend/Parser.hs
+src/Frontend/Parser.info
+
+!relatorio/Compiladores___TP.pdf

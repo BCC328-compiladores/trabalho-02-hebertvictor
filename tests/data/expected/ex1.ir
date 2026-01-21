@@ -1,0 +1,18 @@
+Program [
+    FuncDef {
+        symbol_name = "factorial",
+        function_rtype = TypeInt,
+        function_parameters = [VarDecl "n" TypeInt],
+        function_gtypes = [],
+        function_body = [If (ExpLeq (ExpVariable (VarAccess "n" VarAccessNothing)) (ExpLitInteger 1)) [Return (ExpLitInteger 1)] [Return (ExpMul (ExpVariable (VarAccess "n" VarAccessNothing)) (ExpFCall "factorial" [ExpSub (ExpVariable (VarAccess "n" VarAccessNothing)) (ExpLitInteger 1)]))]],
+        symbol_pos = SrcPos (7, 6)
+    }, 
+    FuncDef {
+        symbol_name = "main",
+        function_rtype = TypeInt,
+        function_parameters = [],
+        function_gtypes = [],
+        function_body = [VarDef (VarDecl "result" TypeInt) (ExpFCall "factorial" [ExpLitInteger 5]), CmdExpression (ExpFCall "print" [ExpVariable (VarAccess "result" VarAccessNothing)]), Return (ExpLitInteger 0)],
+        symbol_pos = SrcPos (16, 6)
+    }
+]

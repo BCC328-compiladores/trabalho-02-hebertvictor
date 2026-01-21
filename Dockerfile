@@ -5,6 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH="/root/.cabal/bin:/root/.ghcup/bin:$PATH"
 ENV GHCUP_INSTALL_BASE_PREFIX="/root"
 
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
@@ -68,6 +69,11 @@ VOLUME ["/workspace"]
 
 # Expose common development ports
 EXPOSE 8000 8080 3000
+
+
+# UTF8
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
 # Default command
 CMD ["/bin/bash"]

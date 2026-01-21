@@ -1,0 +1,93 @@
+% =====================================
+% BCC328 (25.2) Construção de Compiladores
+% -------------------------------------
+% <main.tex>
+% Main document.
+% =====================================
+
+% document setup.
+\input{setup}
+
+
+%
+%
+\begin{document}
+%
+%
+
+\maketitle
+
+\begin{abstract}
+\begin{center} 
+Neste trabalho prático nós construímos um compilador da linguagem SL para WebAssembly (WAT).
+Usamos o ambiente de desenvolvimento Haskell, com os pacotes Alex e Happy, para as análises léxicas e sintáticas, respectivamente.
+Neste documento nós documentamos as nossas escolhas e motivação por trás do resultado final.
+\end{center} 
+\end{abstract}
+
+\clearpage
+
+\tableofcontents
+
+\clearpage
+
+%====================================
+
+\section{Introdução}
+\input{sections/introduction}
+
+
+\section{Metodologia}
+\input{sections/methodology}
+
+
+\clearpage
+
+
+\section{Arquitetura do Compilador}
+\input{sections/architecture}
+
+%\subsection{Análise semântica}
+%\input{sections/architecture/semantic analysis}
+
+%\subsection{Geração de código}
+%\input{sections/architecture/code_generation}
+
+\clearpage
+
+
+\section{Resultados e Discussão}
+\input{sections/results}
+
+\clearpage
+
+
+\section{Conclusão}
+\input{sections/conclusion}
+
+\begin{thebibliography}{9}
+\bibitem{aho2006}
+Aho, A. V., Lam, M. S., Sethi, R., Ullman, J. D. (2006).
+\emph{Compilers: Principles, Techniques, and Tools} (2nd ed.).
+Addison-Wesley.
+
+\bibitem{happy}
+Marlow, S., Gill, A., et al.
+\emph{Happy: The Parser Generator for Haskell — User Guide}.
+Disponível em: \texttt{https://www.haskell.org/happy/}.
+
+\bibitem{alex}
+Marlow, S., Gill, A., et al.
+\emph{Alex: The Lexical Analyser Generator for Haskell — User Guide}.
+Disponível em: \texttt{https://www.haskell.org/alex/}.
+
+\bibitem{webassembly2023}
+WebAssembly Community Group. (2023). \emph{WebAssembly Specification}.
+\end{thebibliography}
+
+
+%
+%
+\end{document}
+%
+%

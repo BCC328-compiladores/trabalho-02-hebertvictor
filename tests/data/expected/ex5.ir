@@ -1,0 +1,138 @@
+Program [
+
+    FuncDef {
+        symbol_name = "id",
+        function_rtype = TypeVoid,
+        function_parameters = [
+            VarDecl "x" TypeVoid
+        ],
+        function_gtypes = [],
+        function_body = [
+            Return (ExpVariable (VarAccess "x" VarAccessNothing))
+        ],
+        symbol_pos = SrcPos (7, 6)
+    },
+
+    FuncDef {
+        symbol_name = "map",
+        function_rtype = TypeArray (TypeGeneric "b") [ExpNothing],
+        function_parameters = [
+            VarDecl "f" (TypeFunction [(TypeGeneric "a")] (TypeGeneric "b")),
+            VarDecl "v" (TypeArray (TypeGeneric "a") [ExpNothing])
+        ],
+        function_gtypes = ["a", "b"],
+        function_body = [
+            VarDef
+                (VarDecl "result" TypeVoid)
+                (ExpNew
+                    (TypeArray
+                        (TypeGeneric "b")
+                        [ExpVariable (VarAccess "v" (VarAccess "size" VarAccessNothing))])),
+
+            For
+                (Assignment (VarAccess "i" VarAccessNothing) (ExpLitInteger 0))
+                (ExpLt
+                    (ExpVariable (VarAccess "i" VarAccessNothing))
+                    (ExpVariable (VarAccess "v" (VarAccess "size" VarAccessNothing))))
+                (ExpLIncr (ExpVariable (VarAccess "i" VarAccessNothing)))
+                [
+                    Assignment
+                        (VarAccess "result"
+                            (VarAccessIndex
+                                (ExpVariable (VarAccess "i" VarAccessNothing))
+                                VarAccessNothing))
+                        (ExpFCall "f" [
+                            ExpVariable
+                                (VarAccess "v"
+                                    (VarAccessIndex
+                                        (ExpVariable (VarAccess "i" VarAccessNothing))
+                                        VarAccessNothing))
+                        ])
+                ],
+
+            Return (ExpVariable (VarAccess "result" VarAccessNothing))
+        ],
+        symbol_pos = SrcPos (12, 19)
+    },
+
+    FuncDef {
+        symbol_name = "a_real_nothing",
+        function_rtype = TypeFloat,
+        function_parameters = [
+            VarDecl "x" TypeInt
+        ],
+        function_gtypes = [],
+        function_body = [
+            If
+                (ExpGeq
+                    (ExpVariable (VarAccess "x" VarAccessNothing))
+                    (ExpLitInteger 5))
+                [
+                    Return (ExpLitFloating 1.0)
+                ]
+                [],
+
+            Return (ExpLitFloating 0.0)
+        ],
+        symbol_pos = SrcPos (23, 6)
+    },
+
+    FuncDef {
+        symbol_name = "main",
+        function_rtype = TypeVoid,
+        function_parameters = [],
+        function_gtypes = [],
+        function_body = [
+
+            CmdExpression
+                (ExpFCall "print" [
+                    ExpFCall "id" [ExpLitFloating 5.0]
+                ]),
+
+            CmdExpression
+                (ExpFCall "print" [
+                    ExpFCall "id" [ExpLitInteger 5]
+                ]),
+
+            CmdExpression
+                (ExpFCall "print" [
+                    ExpFCall "id" [ExpLitString "olá"]
+                ]),
+
+            VarDef
+                (VarDecl "asd" (TypeArray TypeInt [ExpNothing]))
+                (ExpArrayInstancing [
+                    ExpLitInteger 3,
+                    ExpLitInteger 1,
+                    ExpLitInteger 4,
+                    ExpLitInteger 1,
+                    ExpLitInteger 5
+                ]),
+
+            VarDef
+                (VarDecl "new_asd" (TypeArray TypeFloat [ExpNothing]))
+                (ExpFCall "map" [
+                    ExpVariable (VarAccess "a_real_nothing" VarAccessNothing),
+                    ExpVariable (VarAccess "asd" VarAccessNothing)
+                ]),
+
+            For
+                (VarDef (VarDecl "i" TypeInt) (ExpLitInteger 0))
+                (ExpLt
+                    (ExpVariable (VarAccess "i" VarAccessNothing))
+                    (ExpVariable (VarAccess "new_asd" (VarAccess "size" VarAccessNothing))))
+                (ExpLIncr (ExpVariable (VarAccess "i" VarAccessNothing)))
+                [
+                    CmdExpression
+                        (ExpFCall "print" [
+                            ExpVariable
+                                (VarAccess "new_asd"
+                                    (VarAccessIndex
+                                        (ExpVariable (VarAccess "i" VarAccessNothing))
+                                        VarAccessNothing))
+                        ])
+                ]
+        ],
+        symbol_pos = SrcPos (32, 6)
+    }
+]

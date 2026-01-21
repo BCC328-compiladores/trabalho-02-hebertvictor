@@ -1,0 +1,200 @@
+Token {pos = SrcPos (7,1), lexeme = T_Func}
+Token {pos = SrcPos (7,6), lexeme = T_Identifier "id"}
+Token {pos = SrcPos (7,8), lexeme = T_LParenthesis}
+Token {pos = SrcPos (7,9), lexeme = T_Identifier "x"}
+Token {pos = SrcPos (7,10), lexeme = T_RParenthesis}
+Token {pos = SrcPos (7,12), lexeme = T_LBrace}
+Token {pos = SrcPos (8,5), lexeme = T_Return}
+Token {pos = SrcPos (8,12), lexeme = T_Identifier "x"}
+Token {pos = SrcPos (8,13), lexeme = T_Semicolon}
+Token {pos = SrcPos (9,1), lexeme = T_RBrace}
+Token {pos = SrcPos (12,1), lexeme = T_Forall}
+Token {pos = SrcPos (12,8), lexeme = T_Identifier "a"}
+Token {pos = SrcPos (12,10), lexeme = T_Identifier "b"}
+Token {pos = SrcPos (12,12), lexeme = T_Dot}
+Token {pos = SrcPos (12,14), lexeme = T_Func}
+Token {pos = SrcPos (12,19), lexeme = T_Identifier "map"}
+Token {pos = SrcPos (12,23), lexeme = T_LParenthesis}
+Token {pos = SrcPos (12,24), lexeme = T_Identifier "f"}
+Token {pos = SrcPos (12,25), lexeme = T_Colon}
+Token {pos = SrcPos (12,27), lexeme = T_LParenthesis}
+Token {pos = SrcPos (12,28), lexeme = T_Identifier "a"}
+Token {pos = SrcPos (12,29), lexeme = T_RParenthesis}
+Token {pos = SrcPos (12,31), lexeme = T_RArrow}
+Token {pos = SrcPos (12,34), lexeme = T_Identifier "b"}
+Token {pos = SrcPos (12,35), lexeme = T_Comma}
+Token {pos = SrcPos (12,37), lexeme = T_Identifier "v"}
+Token {pos = SrcPos (12,38), lexeme = T_Colon}
+Token {pos = SrcPos (12,40), lexeme = T_Identifier "a"}
+Token {pos = SrcPos (12,41), lexeme = T_LBracket}
+Token {pos = SrcPos (12,42), lexeme = T_RBracket}
+Token {pos = SrcPos (12,43), lexeme = T_RParenthesis}
+Token {pos = SrcPos (12,45), lexeme = T_Colon}
+Token {pos = SrcPos (12,47), lexeme = T_Identifier "b"}
+Token {pos = SrcPos (12,48), lexeme = T_LBracket}
+Token {pos = SrcPos (12,49), lexeme = T_RBracket}
+Token {pos = SrcPos (12,51), lexeme = T_LBrace}
+Token {pos = SrcPos (13,5), lexeme = T_Let}
+Token {pos = SrcPos (13,9), lexeme = T_Identifier "result"}
+Token {pos = SrcPos (13,16), lexeme = T_Equal}
+Token {pos = SrcPos (13,18), lexeme = T_New}
+Token {pos = SrcPos (13,22), lexeme = T_Identifier "b"}
+Token {pos = SrcPos (13,23), lexeme = T_LBracket}
+Token {pos = SrcPos (13,24), lexeme = T_Identifier "v"}
+Token {pos = SrcPos (13,25), lexeme = T_Dot}
+Token {pos = SrcPos (13,26), lexeme = T_Identifier "size"}
+Token {pos = SrcPos (13,30), lexeme = T_RBracket}
+Token {pos = SrcPos (13,31), lexeme = T_Semicolon}
+Token {pos = SrcPos (15,5), lexeme = T_For}
+Token {pos = SrcPos (15,9), lexeme = T_LParenthesis}
+Token {pos = SrcPos (15,10), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (15,12), lexeme = T_Equal}
+Token {pos = SrcPos (15,14), lexeme = T_Integral 0}
+Token {pos = SrcPos (15,15), lexeme = T_Semicolon}
+Token {pos = SrcPos (15,17), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (15,19), lexeme = T_LAngle}
+Token {pos = SrcPos (15,21), lexeme = T_Identifier "v"}
+Token {pos = SrcPos (15,22), lexeme = T_Dot}
+Token {pos = SrcPos (15,23), lexeme = T_Identifier "size"}
+Token {pos = SrcPos (15,27), lexeme = T_Semicolon}
+Token {pos = SrcPos (15,29), lexeme = T_Incr}
+Token {pos = SrcPos (15,32), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (15,33), lexeme = T_RParenthesis}
+Token {pos = SrcPos (15,35), lexeme = T_LBrace}
+Token {pos = SrcPos (16,9), lexeme = T_Identifier "result"}
+Token {pos = SrcPos (16,15), lexeme = T_LBracket}
+Token {pos = SrcPos (16,16), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (16,17), lexeme = T_RBracket}
+Token {pos = SrcPos (16,19), lexeme = T_Equal}
+Token {pos = SrcPos (16,21), lexeme = T_Identifier "f"}
+Token {pos = SrcPos (16,22), lexeme = T_LParenthesis}
+Token {pos = SrcPos (16,23), lexeme = T_Identifier "v"}
+Token {pos = SrcPos (16,24), lexeme = T_LBracket}
+Token {pos = SrcPos (16,25), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (16,26), lexeme = T_RBracket}
+Token {pos = SrcPos (16,27), lexeme = T_RParenthesis}
+Token {pos = SrcPos (16,28), lexeme = T_Semicolon}
+Token {pos = SrcPos (17,5), lexeme = T_RBrace}
+Token {pos = SrcPos (19,5), lexeme = T_Return}
+Token {pos = SrcPos (19,12), lexeme = T_Identifier "result"}
+Token {pos = SrcPos (19,18), lexeme = T_Semicolon}
+Token {pos = SrcPos (20,1), lexeme = T_RBrace}
+Token {pos = SrcPos (23,1), lexeme = T_Func}
+Token {pos = SrcPos (23,6), lexeme = T_Identifier "a_real_nothing"}
+Token {pos = SrcPos (23,20), lexeme = T_LParenthesis}
+Token {pos = SrcPos (23,21), lexeme = T_Identifier "x"}
+Token {pos = SrcPos (23,23), lexeme = T_Colon}
+Token {pos = SrcPos (23,25), lexeme = T_TypeInt}
+Token {pos = SrcPos (23,28), lexeme = T_RParenthesis}
+Token {pos = SrcPos (23,30), lexeme = T_Colon}
+Token {pos = SrcPos (23,32), lexeme = T_TypeFloat}
+Token {pos = SrcPos (23,38), lexeme = T_LBrace}
+Token {pos = SrcPos (24,5), lexeme = T_If}
+Token {pos = SrcPos (24,8), lexeme = T_LParenthesis}
+Token {pos = SrcPos (24,9), lexeme = T_Identifier "x"}
+Token {pos = SrcPos (24,11), lexeme = T_ExpGeq}
+Token {pos = SrcPos (24,14), lexeme = T_Integral 5}
+Token {pos = SrcPos (24,15), lexeme = T_RParenthesis}
+Token {pos = SrcPos (24,17), lexeme = T_LBrace}
+Token {pos = SrcPos (25,9), lexeme = T_Return}
+Token {pos = SrcPos (25,16), lexeme = T_Floating 1.0}
+Token {pos = SrcPos (25,19), lexeme = T_Semicolon}
+Token {pos = SrcPos (26,5), lexeme = T_RBrace}
+Token {pos = SrcPos (28,5), lexeme = T_Return}
+Token {pos = SrcPos (28,12), lexeme = T_Floating 0.0}
+Token {pos = SrcPos (28,15), lexeme = T_Semicolon}
+Token {pos = SrcPos (29,1), lexeme = T_RBrace}
+Token {pos = SrcPos (32,1), lexeme = T_Func}
+Token {pos = SrcPos (32,6), lexeme = T_Identifier "main"}
+Token {pos = SrcPos (32,10), lexeme = T_LParenthesis}
+Token {pos = SrcPos (32,11), lexeme = T_TypeVoid}
+Token {pos = SrcPos (32,15), lexeme = T_RParenthesis}
+Token {pos = SrcPos (32,17), lexeme = T_Colon}
+Token {pos = SrcPos (32,19), lexeme = T_TypeVoid}
+Token {pos = SrcPos (32,24), lexeme = T_LBrace}
+Token {pos = SrcPos (35,5), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (35,10), lexeme = T_LParenthesis}
+Token {pos = SrcPos (35,11), lexeme = T_Identifier "id"}
+Token {pos = SrcPos (35,13), lexeme = T_LParenthesis}
+Token {pos = SrcPos (35,14), lexeme = T_Floating 5.0}
+Token {pos = SrcPos (35,17), lexeme = T_RParenthesis}
+Token {pos = SrcPos (35,18), lexeme = T_RParenthesis}
+Token {pos = SrcPos (35,19), lexeme = T_Semicolon}
+Token {pos = SrcPos (36,5), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (36,10), lexeme = T_LParenthesis}
+Token {pos = SrcPos (36,11), lexeme = T_Identifier "id"}
+Token {pos = SrcPos (36,13), lexeme = T_LParenthesis}
+Token {pos = SrcPos (36,14), lexeme = T_Integral 5}
+Token {pos = SrcPos (36,15), lexeme = T_RParenthesis}
+Token {pos = SrcPos (36,16), lexeme = T_RParenthesis}
+Token {pos = SrcPos (36,17), lexeme = T_Semicolon}
+Token {pos = SrcPos (37,5), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (37,10), lexeme = T_LParenthesis}
+Token {pos = SrcPos (37,11), lexeme = T_Identifier "id"}
+Token {pos = SrcPos (37,13), lexeme = T_LParenthesis}
+Token {pos = SrcPos (37,14), lexeme = T_String "ol\225"}
+Token {pos = SrcPos (37,19), lexeme = T_RParenthesis}
+Token {pos = SrcPos (37,20), lexeme = T_RParenthesis}
+Token {pos = SrcPos (37,21), lexeme = T_Semicolon}
+Token {pos = SrcPos (40,5), lexeme = T_Let}
+Token {pos = SrcPos (40,9), lexeme = T_Identifier "asd"}
+Token {pos = SrcPos (40,13), lexeme = T_Colon}
+Token {pos = SrcPos (40,15), lexeme = T_TypeInt}
+Token {pos = SrcPos (40,18), lexeme = T_LBracket}
+Token {pos = SrcPos (40,19), lexeme = T_RBracket}
+Token {pos = SrcPos (40,21), lexeme = T_Equal}
+Token {pos = SrcPos (40,23), lexeme = T_LBracket}
+Token {pos = SrcPos (40,25), lexeme = T_Integral 3}
+Token {pos = SrcPos (40,26), lexeme = T_Comma}
+Token {pos = SrcPos (40,28), lexeme = T_Integral 1}
+Token {pos = SrcPos (40,29), lexeme = T_Comma}
+Token {pos = SrcPos (40,31), lexeme = T_Integral 4}
+Token {pos = SrcPos (40,32), lexeme = T_Comma}
+Token {pos = SrcPos (40,34), lexeme = T_Integral 1}
+Token {pos = SrcPos (40,35), lexeme = T_Comma}
+Token {pos = SrcPos (40,37), lexeme = T_Integral 5}
+Token {pos = SrcPos (40,39), lexeme = T_RBracket}
+Token {pos = SrcPos (40,40), lexeme = T_Semicolon}
+Token {pos = SrcPos (41,5), lexeme = T_Let}
+Token {pos = SrcPos (41,9), lexeme = T_Identifier "new_asd"}
+Token {pos = SrcPos (41,17), lexeme = T_Colon}
+Token {pos = SrcPos (41,19), lexeme = T_TypeFloat}
+Token {pos = SrcPos (41,24), lexeme = T_LBracket}
+Token {pos = SrcPos (41,25), lexeme = T_RBracket}
+Token {pos = SrcPos (41,27), lexeme = T_Equal}
+Token {pos = SrcPos (41,29), lexeme = T_Identifier "map"}
+Token {pos = SrcPos (41,32), lexeme = T_LParenthesis}
+Token {pos = SrcPos (41,33), lexeme = T_Identifier "a_real_nothing"}
+Token {pos = SrcPos (41,47), lexeme = T_Comma}
+Token {pos = SrcPos (41,49), lexeme = T_Identifier "asd"}
+Token {pos = SrcPos (41,52), lexeme = T_RParenthesis}
+Token {pos = SrcPos (41,53), lexeme = T_Semicolon}
+Token {pos = SrcPos (43,5), lexeme = T_For}
+Token {pos = SrcPos (43,9), lexeme = T_LParenthesis}
+Token {pos = SrcPos (43,10), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (43,12), lexeme = T_Colon}
+Token {pos = SrcPos (43,14), lexeme = T_TypeInt}
+Token {pos = SrcPos (43,18), lexeme = T_Equal}
+Token {pos = SrcPos (43,20), lexeme = T_Integral 0}
+Token {pos = SrcPos (43,21), lexeme = T_Semicolon}
+Token {pos = SrcPos (43,23), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (43,25), lexeme = T_LAngle}
+Token {pos = SrcPos (43,27), lexeme = T_Identifier "new_asd"}
+Token {pos = SrcPos (43,34), lexeme = T_Dot}
+Token {pos = SrcPos (43,35), lexeme = T_Identifier "size"}
+Token {pos = SrcPos (43,39), lexeme = T_Semicolon}
+Token {pos = SrcPos (43,41), lexeme = T_Incr}
+Token {pos = SrcPos (43,44), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (43,45), lexeme = T_RParenthesis}
+Token {pos = SrcPos (43,47), lexeme = T_LBrace}
+Token {pos = SrcPos (44,9), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (44,14), lexeme = T_LParenthesis}
+Token {pos = SrcPos (44,15), lexeme = T_Identifier "new_asd"}
+Token {pos = SrcPos (44,22), lexeme = T_LBracket}
+Token {pos = SrcPos (44,23), lexeme = T_Identifier "i"}
+Token {pos = SrcPos (44,24), lexeme = T_RBracket}
+Token {pos = SrcPos (44,25), lexeme = T_RParenthesis}
+Token {pos = SrcPos (44,26), lexeme = T_Semicolon}
+Token {pos = SrcPos (45,5), lexeme = T_RBrace}
+Token {pos = SrcPos (46,1), lexeme = T_RBrace}
+Token {pos = SrcPos (47,1), lexeme = T_EOF}

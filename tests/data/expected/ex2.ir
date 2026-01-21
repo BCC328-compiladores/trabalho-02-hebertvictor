@@ -1,0 +1,25 @@
+Program [
+    StructDef {
+        symbol_name = "Person", 
+        fields = [VarDecl "name" TypeString, VarDecl "age" TypeInt, VarDecl "height" TypeFloat],
+        symbol_pos = SrcPos (7, 8)
+    },
+    FuncDef {
+        symbol_name = "main", 
+        function_rtype = TypeVoid, 
+        function_parameters = [], 
+        function_gtypes = [], 
+        function_body = [
+            VarDef (VarDecl "people" (TypeArray (TypeGeneric "Person") [ExpLitInteger 3])) ExpNothing,
+            Assignment (VarAccess "people" (VarAccessIndex (ExpLitInteger 0) VarAccessNothing)) (ExpStructInstance "Person" [ExpLitString "Alice", ExpLitInteger 25, ExpLitFloating 1.65]),
+            Assignment (VarAccess "people" (VarAccessIndex (ExpLitInteger 1) VarAccessNothing)) (ExpStructInstance "Person" [ExpLitString "Bob", ExpLitInteger 30, ExpLitFloating 1.8]),
+            Assignment (VarAccess "people" (VarAccessIndex (ExpLitInteger 2) VarAccessNothing)) (ExpStructInstance "Person" [ExpLitString "Charlie", ExpLitInteger 35,ExpLitFloating 1.75]),
+            VarDef (VarDecl "i" TypeInt) (ExpLitInteger 0),
+            While (ExpLt (ExpVariable (VarAccess "i" VarAccessNothing)) (ExpLitInteger 3)) [
+                CmdExpression (ExpFCall "print" [ExpVariable (VarAccess "people" (VarAccessIndex (ExpVariable (VarAccess "i" VarAccessNothing)) (VarAccess "name" VarAccessNothing)))]),
+                CmdExpression (ExpFCall "print" [ExpVariable (VarAccess "people" (VarAccessIndex (ExpVariable (VarAccess "i" VarAccessNothing)) (VarAccess "age" VarAccessNothing)))]),
+                CmdExpression (ExpFCall "print" [ExpVariable (VarAccess "people" (VarAccessIndex (ExpVariable (VarAccess "i" VarAccessNothing)) (VarAccess "height" VarAccessNothing)))]),
+                Assignment (VarAccess "i" VarAccessNothing) (ExpSum (ExpVariable (VarAccess "i" VarAccessNothing)) (ExpLitInteger 1))]],
+        symbol_pos = SrcPos (14, 6)
+    }
+]

@@ -1,0 +1,135 @@
+cabal-version:      3.0
+name:               HarmonicalVortex
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- The license under which the package is released.
+license:            MIT
+
+-- The file containing the license text.
+license-file:       LICENSE
+
+-- The package author(s).
+author:             @HexagonalUniverse, @victorxaviercosta
+
+-- A copyright notice.
+-- copyright:
+category:           Language
+build-type:         Simple
+
+-- Extra doc files to be distributed with the package, such as a CHANGELOG or a README.
+extra-doc-files:    CHANGELOG.md
+
+-- Extra source files to be distributed with the package, such as examples, or a tutorial module.
+-- extra-source-files:
+
+
+common warnings
+    ghc-options: -Wall
+
+
+library
+    exposed-modules:
+        Frontend.Token
+        Frontend.IR
+        Frontend.Error
+        Frontend.Lexer
+        Frontend.Parser
+        Frontend.Pretty
+        Frontend.PrettyTree
+        Frontend.Semantics
+        Interpreter.Interpreter
+
+    hs-source-dirs: src
+    build-depends:
+        base >= 4.17,
+        containers >= 0.6,
+        time >=1.12,
+        array >= 0
+
+    default-language: Haskell2010
+
+
+executable HarmonicalVortex
+    -- Import common warning flags.
+    import:           warnings
+
+    -- .hs or .lhs file containing the Main module.
+    main-is:          Main.hs
+
+    -- Modules included in this executable, other than Main.
+
+    other-modules:
+        -- unfortunately they have to be listed expliclty as it seems...
+        Frontend.Token
+        Frontend.IR
+        Frontend.Error
+        Frontend.Lexer
+        Frontend.Parser
+        Frontend.Pretty
+        Frontend.PrettyTree
+        Frontend.Semantics
+        Interpreter.Interpreter
+
+    -- LANGUAGE extensions used by modules in this package.
+    -- other-extensions:
+
+    -- Other library packages from which modules are imported.
+    build-depends:  base  >= 4.17,
+                    containers >=0.6,
+                    time >=1.12,
+                    array >= 0,
+                    directory,
+                    HarmonicalVortex
+
+    build-tool-depends:
+        alex:alex,
+        happy:happy
+
+    -- Directories containing source files.
+    hs-source-dirs:   src
+
+    -- Base language which the package is written in.
+    default-language: Haskell2010
+
+
+-- Testing agasting data...
+test-suite data-tests 
+    type: exitcode-stdio-1.0
+
+    hs-source-dirs: tests, src
+    
+    main-is: Tests.hs
+
+    other-modules:
+        Frontend.Token
+        Frontend.IR
+        Frontend.Error
+        Frontend.Lexer
+        Frontend.Parser
+        Frontend.Pretty
+        Frontend.PrettyTree
+        Frontend.Semantics
+        Interpreter.Interpreter
+        LexerTests
+        ParserTests
+        PrettyTests
+
+    build-depends:
+        base >= 4.17,
+        containers >=0.6,
+        time >=1.12,
+        array >= 0,
+        hspec >= 2.7,
+        HarmonicalVortex
+
+    build-tool-depends:
+      alex:alex,
+      happy:happy
+
+    default-language: Haskell2010

@@ -1,0 +1,108 @@
+% == Results ==
+Os analisadores léxico e sintático produziram resultado aparentemente satisfatório: não obtivemos nenhum erro de implementação e conseguimos resolver todos os conflitos do tipo \textit{shift-reduce} e \textit{reduce-reduce}, passíveis de ocorrer na geração do analisador ascendente LALR(1) (analisador padrão utilizado pelo happy). 
+Além disso, os testes automatizados ajudam a garantir a corretude de cada parte do sistema.
+
+
+% -------------------------------
+\subsection{Testes Automatizados}
+% -------------------------------
+
+\label{subsec:tests}
+Os testes realizados foram estruturados utilizando o framework \texttt{Test.Hspec}, onde cada cenário de teste deve ser definido como uma função monádica do tipo \texttt{Spec} que posteriormente podem ser instanciadas na função \texttt{hspec}. Assim, definimos os seguintes módulos de teste: \texttt{LexerTests}, \texttt{ParserTests}, \texttt{PrettyTests}, onde são definidos os testes do analisador léxico, sintático e do modo de impressão ``pretty'', respectivamente.
+
+\begin{lstlisting}[language=Haskell, numbers=none]
+main :: IO ()
+main = hspec $ do
+    LexerTests.tests
+    ParserTests.tests
+    PrettyTests.tests
+\end{lstlisting}
+
+
+Em cada função de teste, definimos um item de teste com a função \texttt{it}, onde especificamos a operação a ser executada e o resultado esperado, comparando-os com a função \texttt{shouldBe}, conforme o seguinte exemplo:
+
+\begin{lstlisting}[language=Haskell, numbers=none]
+cflx_specs :: Spec
+cflx_specs = describe "Parsing Control Flux" $ do
+    it "only if" $ do
+        let parsed = parse_sl "func main() : void { if (true) {} }"
+        parsed `shouldBe` (Right $ Program [FuncDef {
+            function_name       = "main",
+            function_rtype      = TypeVoid,
+            function_parameters = [],
+            function_gtypes     = [],
+            function_body       = [
+                If (ExpLitBoolean True) [] []
+            ]
+        }])
+\end{lstlisting}
+
+os testes desenvolvidos incluem:
+\begin{multicols}{2}
+\begin{itemize}
+    \item Casos de erro (léxico de sintático)
+    \item Representação de literais numéricos
+    \item Expressões
+    \item Definições de structs.
+    \item Definições de funções.
+    \item Controle de fluxo.
+    \item Arranjos.
+    \item Testes léxicos e sintáticos sobre arquivos de entrada.
+\end{itemize}
+\end{multicols}
+
+
+
+\subsection{Limitações}
+Algumas das limitações identificadas no trabalho desenvolvido incluem:
+\begin{enumerate}
+    \item As expressões estão definidas de um modo um tanto quanto genérico, permitindo que expressões não válidas sejam corretamente derivadas pela análise sintática.
+    Entretanto, a limitação é esperada, visto que a avaliação do tipo de expressões deve ser tarefa da análise semântica.
+    
+    \item Segue que não temos a análise e inferência de tipos.  
+    
+    \item Não há comportamento executável do código SL, visto que neste estágio ainda não geramos código para o programa, nem temos ainda um interpretador.
+\end{enumerate}
+
+
+
+% -----------------------------
+\subsection*{Instruções de Uso}
+% -----------------------------
+
+Conforme as especificações deste trabalho, o projeto desenvolvido deve ter como plataforma-alvo o ambiente docker baseado em linux-ubutu:22.04 cujas dependências e configurações foram pré-estabelecidas de acordo com o arquivos \texttt{Dockerfile} e \texttt{docker-compose} fornecidos. Com base nessa premissa, apresentamos as seguintes instruções para a utilização do compilador desenvolvido:
+
+\subsubsection*{Execução do ambiente docker compose}
+\begin{lstlisting}[numbers=none]
+    make run-docker
+\end{lstlisting}
+
+\bigskip
+Ou, alternativamente:
+\begin{lstlisting}[numbers=none]
+	docker-compose up -d
+	docker-compose exec sl bash
+\end{lstlisting}
+
+
+\subsubsection*{Construção do projeto}
+\begin{lstlisting}[numbers=none]
+    cabal build
+\end{lstlisting}
+
+\subsubsection*{Execução do compilador}
+\begin{lstlisting}[numbers=none]
+    cabal run HarmonicalVortex -- <arquivo sl> [opcoes]
+\end{lstlisting}
+
+com as seguintes opções disponíveis:
+\begin{itemize}
+    \item \textbf{\texttt{-l, -{}-lexer}:} Executa somente a análise láxica e exibe os tokens.
+    \item \textbf{\texttt{-p, -{}-parser}:} Executa a análise léxica e sintática, exibindo a árvore de sintaxe obtida.
+    \item \textbf{\texttt{-pt, -{}-pretty}:} Executa a análise léxica e sintática, exibindo uma versão textual do programa reconstruído através da árvore de sintaxe obtida.
+\end{itemize}
+
+\subsubsection*{Execução dos testes automatizados}
+\begin{lstlisting}[numbers=none]
+    cabal test
+\end{lstlisting}

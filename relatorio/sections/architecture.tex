@@ -1,0 +1,178 @@
+% == Architecture ==
+
+O projeto do compilador construído foi denominado \texttt{HarmonicalVortex} e está, até então, estruturado da seguinte maneira:
+
+\begin{figure}[h]
+\centering
+\footnotesize
+
+\begin{minipage}{0.48\textwidth}
+\begin{forest} directory tree
+[HarmonicalVortex
+    [data
+        [sl
+            [ex1.sl]
+            [...]
+        ]
+    ]
+    [src
+        [Frontend
+            [Error.hs]
+            [IR.hs]
+            [Lexer.x]
+            [Parser.y]
+            [Pretty.hs]
+            [PrettyTree.hs]
+            [Semantics.hs]
+            [Token.hs]
+        ]
+        [Main.hs]
+    ]
+    [...]
+ ]   
+\end{forest}
+\end{minipage}%
+\hfill
+\begin{minipage}{0.48\textwidth}
+\begin{forest} directory tree
+[HarmonicalVortex
+    [...]
+    [tests
+        [data
+            [expected
+                [ex1.ir]
+                [...]
+            ]
+        ]
+        [LexerTests.hs]
+        [ParserTests.hs]
+        [PrettyTests.hs]
+        [Tests.hs]
+    ]
+    [docker-compose.yml]
+    [Dockerfile]
+    [HarmonicalVortex.cabal]
+    [README.md]
+]
+\end{forest}
+\end{minipage}
+
+\caption{Estrutura de diretórios do projeto HarmonicalVortex}
+\end{figure}
+
+
+O projeto está organizado seguindo uma simples divisão lógica: dados de entrada; código-fonte do compilador; e um módulo de testes \ref{subsec:tests}.
+No que tange à implementação do compilador, o projeto foi modularizado considerando a separação entre o frontend e backend do compilador. Inicialmente, trabalhamos apenas sobre o frontend, que constitui toda tarefa relativa à análise do código fonte da linguagem, sendo essencialmente divido em: Análise Léxica, Sintática e Semântica. 
+
+Dentro do frontend,
+em \texttt{Error.hs},
+separamos logicamente os diferentes tipos de erro que o compilador pode emitir, na intenção de facilitar a depuração dos códigos dos usuários, conforme descrito em \ref{subsubsec:types_error}. \texttt{IR.hs} define os tipos que compõe a representação intermediária ou árvore de sintaxe do compilador (veja \ref{subsubsec:types_ir}). \texttt{Token.hs}, por sua vez, armazena as definiçõs dos tipos Token e Lexeme \ref{subsubsec:types_tokens}. \texttt{Lexer.x} e \texttt{Parser.y} apresentam a implementação do analisador léxico pelo framework do Alex, e do analisador sintático definido pelo Happy, respectivamente. Esses arquivos são compilados para código Haskell pelos drivers destes frameworks produzindo, no mesmo diretório, os arquivos \texttt{Lexer.hs} e \texttt{Parser.hs}. Por fim, em \texttt{Pretty} e \texttt{PrettyTree} as definições descritas em \ref{subsubsec:types_pretty} são aplicadas para a construção de uma string ``embelezada'' da árvore de sintaxe obtida na análise léxica.
+
+\bigskip
+Futuramente, em \texttt{Semantics.hs}, será implementado o analisador semântico de SL.
+
+
+
+\subsection{Análise léxica}
+Conforme mencionado, o analisador léxico foi construído segundo as especificações do Alex\footnote{\hyperlink{https://haskell-alex.readthedocs.io/en/latest/index.html}{Documentação do Alex}}. Especificamente, utilizamos o wrapper \texttt{"monadUserState"} que que combina execução monádica com a possibilidade de manter um estado definido pelo usuário durante a análise léxica (\texttt{AlexUserState}). Escolhemos este wrapper justamente para tirar proveito desta definição de estado, sendo que acabamos aproveitando esta habilidade apenas para que o analisador léxico possibilitasse o aninhamento de comentários, uma característica não exigida para a linguagem, mas considerada útil. No entanto, consideramos ainda que tal habilidade pode ser útil para outros fins, caso necessário em avaliações futuras.
+
+No geral, a arquitetura do analisador léxico segue as especificações do framework do Alex. Primeiro, definimos as expressões regulares básicas para dígitos, números inteiros, números em ponto flutuante, caracteres, identificadores e literais string. Depois, definimos as regras de produção dos diferentes tokens baseado nas ER's definidas. Por fim, especificamos os procedimentos básicos de erro, manipulação do estado de usuário definido e a chamada principal do analisador léxico em si (veja \ref{subsubsec:types_lexer}).
+
+
+\subsection{Análise sintática}
+
+Para análise sintática utilizamos o Happy. 
+Seu framework básico é um gerador de analisadores sintáticos do tipo LALR(1).
+
+Na configuração do Happy,
+primeiro especificamos as definições básicas do analisador: o tipo mônada utilizado (quando deseja-se definir um parser monádico), a chamada do analisador léxico utilizado para a produção dos tokens (no caso, especificamos o tipo da mônada do Alex e o analisador léxico construído anteriormente). 
+Em seguida, definimos os símbolos terminais da gramática e as regras para extração dos mesmos, o que corresponde a um simples casamento de padrão com os tipos de Token que os representa. 
+Então, definimos a precedência e associatividade dos diferentes operadores de acordo com a sintaxe do Happy: os operadores devem ser especificados na ordem de menor para maior precedência com os rótulos de associatividade respectivos (\texttt{\%left}, \texttt{\%right}, ou \texttt{\%nonassoc}). 
+Seguindo, especificamos as regras de derivação que definem a gramática livre-de-contexto que produz a linguagem SL, conforme especificado em \ref{subsec:syntax_structure}.
+Neste passo, tenta-se uma tradução fiel da gramática, contudo seja possível observar pequenas divergências em alguns pontos na implementação por questões práticas.
+Finalmente, especificamos a chamada principal para o parser.
+
+
+\subsection{Árvore de sintaxe abstrata} \label{subsec:syntactic_analysis}
+
+A seguir, apresenta-se o esquema que representa um exemplo prático da estrutura da árvore de sintaxe abstrata gerada a partir da função fatorial definida no exemplo \ref{lst:ex2}, segundo as definições es Haskell apresentadas em \ref{subsubsec:types_ir}.
+
+
+%=====================================================================
+\begin{figure}[h]
+\centering
+\footnotesize
+
+\begin{forest}
+for tree={
+    font=\ttfamily
+}
+[Program
+    [Func\_Def
+        [name 
+            [\texttt{"factorial"}]
+        ]
+        [rtype
+            [TypeInt]
+        ]
+        [parameters
+            [VarDecl
+                [\texttt{"n"}]
+                [TypeInt]
+            ]
+        ]
+        [gtypes
+            [\texttt{[\;]}]
+        ]
+        [function\_body
+            [...]
+        ]
+    ]
+]
+\end{forest}
+
+\vspace{0.3cm}
+
+\begin{forest}
+for tree={font=\ttfamily}
+[function\_body
+    [If
+        [ExpLeq
+            [VarAccess
+                [\texttt{"n"}]
+                [VarAccessNothing]
+            ]
+            [ExpLitInteger 1]
+        ]
+        [\texttt{[Comands]}
+            [Return
+                [ExpLitInteger 1]
+            ]
+        ]
+        [\texttt{[Comands]}
+            [Return
+                [ExpMul
+                    [VarAccess
+                        [\texttt{"n"}]
+                        [VarAccessNothing]
+                    ]
+                    [ExpFCall
+                        [\texttt{"factorial"}]
+                        [ExpSub
+                            [VarAccess
+                                [\texttt{"n"}]
+                                [VarAccessNothing]
+                            ]
+                            [ExpLitInteger 1]
+                        ] % ExpSub
+                    ] % ExpFCall
+                ] % ExpMul
+            ] % Return
+        ] % \texttt{[\;]
+    ] % If
+]   % function_body
+\end{forest}
+
+\caption{Exemplo de árvore de sintaxe obtida pelo parsing da função fatorial.}
+\end{figure}
+%=====================================================================

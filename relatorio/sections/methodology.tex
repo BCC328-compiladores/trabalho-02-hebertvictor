@@ -1,0 +1,660 @@
+% == Methodology ==
+
+Para o desenvolimento deste trabalho, utilizamos a linguagem Haskell com os frameworks Alex, para o desenvolvimento do analisador léxico, e Happy para a geração de um analisador sintático LALR(1) a partir da GLC definida. Nesta seção nós apresentaremos a linguagem SL, sua representação formal e definições estruturais em termos de implementação, utilizadas para estudarmos a sua análise.
+
+
+% ========================================
+\subsection{Estrutura sintática de SL} \label{subsec:syntax_structure}
+% ========================================
+
+A sintaxe de SL é bem parecida com a de Rust.
+Com o propósito de apresentarmos a sintaxe da linguagem, primeiramente olhemos para as palavras-chaves da linguagem (veja tab. \ref{tab:kw}).
+
+
+\newcommand{\lra}{\longrightarrow}
+
+
+\begin{table}[ht] % ======================== TABLE ========================
+\centering
+\begin{tabular}{ll}
+\toprule
+Palavra-chave       & Significado \\
+\midrule
+\textbf{func}       & Define uma função. \\
+\textbf{struct}     & Define uma estrutura. \\
+\textbf{let}        & Define uma variável. \\
+\textbf{return}     & Retorno de função. \\
+\textbf{if}         & Inicia um controle de fluxo. \\
+\textbf{elif}       & Alternativa de controle de fluxo. \\
+\textbf{else}       & Alternativa final de controle de fluxo. \\
+\textbf{for}        & Laço de repetição \textit{for}. \\
+\textbf{while}      & Laço de repetição \textit{while}. \\
+\textbf{forall}     & Declaração de tipos genéricos na definição de uma função. \\
+\midrule
+\textbf{new}        & Para a alocação de memória. \\
+\textbf{void}       & Tipo nulo, vazio. \\
+\textbf{bool}       & Tipo booleano. \\
+\textbf{int}        & Tipo de número inteiro. \\
+\textbf{float}      & Tipo de número flutuante. \\
+\textbf{string}     & Tipo de cadeia de caracteres. \\
+\midrule
+\textbf{true}       & Valor booleano verdadeiro. \\
+\textbf{false}      & Valor booleano falso. \\
+\bottomrule
+\addlinespace[1ex]
+\end{tabular}
+%
+\caption{
+Palavras-chaves de SL.
+}
+\label{tab:kw}
+\end{table} % ======================== TABLE ========================
+
+
+\bigskip
+Aqui estão alguns exemplos práticos da sintaxe da linguagem.
+
+
+\begin{lstlisting}[language=SLlanguage, numbers=left, 
+caption={Exemplo 1 SL. Fatorial de um inteiro, recursivo.}, label={lst:ex1}]
+func factorial(n: int) : int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+
+func main(void) : int {
+    let result : int = factorial(5);
+    print(result); // deve imprimir 120
+    return 0;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=SLlanguage, numbers=left, 
+caption={Exemplo 2 SL. Estruturas e arranjos.}, label={lst:ex2}]
+struct Person {
+    name : string;
+    age : int;
+    height : float;
+}
+
+func main() : void {
+    // arranjo
+    let people : Person[3];
+    people[0] = Person{ "Alice", 25, 1.65 };
+    people[1] = Person{ "Bob", 30, 1.80 };
+    people[2] = Person{ "Charlie", 35, 1.75 };
+
+    // it. sobre arranjo
+    let i : int = 0;
+    while (i < 3) {
+        print(people[i].name);
+        print(people[i].age);
+        print(people[i].height);
+
+        i = i + 1;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=SLlanguage, numbers=left, 
+caption={Exemplo 3 SL. Programa para reverter arrays.}, label={lst:ex3}]
+func reverse(arr : int[], size : int) : int [] {
+    let result : int[] = new int[size];
+    
+    let i : int = 0;
+    while (i < size) {
+        result[i] = arr[size - i - 1];
+        i = i + 1;
+    }
+    
+    return result;
+}
+
+func main() : void {
+    let original : int[5] = [1, 2, 3, 4, 5];
+    let reversed : int[] = reverse(original, 5);
+
+    let j : int = 0;
+    while (j < 5) {
+        print(reversed[j]);
+        j = j + 1;
+    }
+}
+\end{lstlisting}
+
+
+\begin{lstlisting}[language=SLlanguage, numbers=left, 
+caption={Exemplo 4 SL. Cálculo numérico em ponto flutuante.}, label={lst:ex4}]
+func calculateBMI(weight : float, height : float) : float {
+    return weight / (height * height);
+}
+
+func isAdult(age : int) : bool {
+    return age >= 18;
+}
+
+func main() : void {
+    let bmi : float = calculateBMI(70.5, 1.75);
+    let adult : bool = isAdult(20);
+
+    print(bmi);
+    print(adult);
+
+    if (adult && bmi > 25.0) {
+        print("adulto com sobrepeso");
+    } else {
+        print("condicao normal");
+    }
+}
+\end{lstlisting}
+
+
+\begin{lstlisting}[language=SLlanguage, numbers=left, 
+caption={Exemplo 5 SL. Inferência de tipo e Generics.}, label={lst:ex5}]
+func id(x) {
+    return x;
+}
+
+forall a b . func map (f: (a) -> b, v: a[]) : b[] {
+    let result = new b[v.size];
+
+    for (i = 0; i < v.size; ++ i) {
+        result[i] = f(v[i]);
+    }
+
+    return result;
+}
+
+func a_real_nothing(x : int) : float {
+    if (x >= 5) {
+        return 1.0;
+    }
+
+    return 0.0;
+}
+
+func main(void) : void {
+    
+    // identity~
+    print(id(5.0));
+    print(id(5));
+    print(id("ola"));
+
+    // map~
+    let asd : int[] = [ 3, 1, 4, 1, 5 ];
+    let new_asd : float[] = map(a_real_nothing, asd);
+
+    for (i : int = 0; i < new_asd.size; ++ i) {
+        print(new_asd[i]);
+    }
+}
+\end{lstlisting}
+
+
+
+\bigskip
+A partir disso, vejamos a gramática sintática geral da linguagem.
+Apresentaremos a gramática de forma top-down.
+
+
+
+
+% ---------------------------------------------------
+\subsubsection{Gramática: Estrutura procedural geral}
+% ---------------------------------------------------
+
+\footnotesize
+\begin{align}
+    P               &\lra \lambda \mid D \; P                                               \label{eq:gr:P} \\
+    D               &\lra St \mid F                                                         \label{eq:gr:D} \\
+    St              &\lra \textbf{struct} \; I \; \{ \; \hat{V} \; \}                       \label{eq:gr:St} \\
+    \hat{V}         &\lra \lambda \mid V \; \textbf{;} \; \hat{V}                           \label{eq:gr:V-hat} \\
+    F               &\lra \textbf{func} \; I(Pm) \;\; T_S^* \; \{ \; \hat{C} \; \} \mid 
+    \textbf{forall} \; \hat{G} \; \textbf{.} \; \textbf{func} \; I(Pm) \;\; T_S^* \; \{ \; \hat{C} \; \}                                                                                                     \label{eq:gr:F} \\
+    Pm              &\lra \lambda \mid \textbf{void} \mid Pm'                               \label{eq:gr:Pm} \\
+    Pm'             &\lra V^* \mid V^* \; \textbf{,} \; Pm'                                 \label{eq:gr:Pm'} \\
+    \hat{G}         &\lra I \mid I \; \hat{G}                                               \label{eq:gr:G-hat} \\
+    \hat{C}          &\lra \lambda \mid C \; \hat{C}                                        \label{eq:gr:C-hat} \\
+    C               &\lra Atr \; \textbf{;} \; \mid C_f \mid R \mid \textbf{return} \; E \; \textbf{;}   
+                                                                                            \label{eq:gr:C} \\
+    Atr             &\lra Atr_D \mid Atr_R                                                  \label{eq:gr:Atr} \\
+    Atr_D           &\lra \textbf{let} \; V = E \mid \textbf{let} \; I = E                  \label{eq:gr:Atr-D} \\
+    Atr_R           &\lra X_A = E                                                           \label{eq:gr:Atr-R} \\
+    C_f             &\lra \textbf{if} \; (E) \; \{ \; \hat{C} \; \} \; \overline{C_f}       \label{eq:gr:C-f} \\
+    \overline{C_f}  &\lra \lambda \mid \textbf{elif} \; (E) \; \{ \; \hat{C} \; \} \; \overline{C_f} \mid \textbf{else} \; \{ \; \hat{C} \; \}                                                                                              \label{eq:gr:C-f-not} \\
+    R               &\lra \textbf{for} \; (E_R; \; E^*; \; E^*) \; \{ \; \hat{C} \; \} \mid \textbf{while} \; (E) \; \{ \; \hat{C} \;\}                                                                                                     \label{eq:gr:R} \\
+    E_R             &\lra Atr_R \; \mid \; V \;\textbf{=}\; E \mid E^* \label{eq:gr:E-R}
+\end{align}
+
+\normalsize
+
+
+
+% ----------------------------------------
+\subsubsection{Gramática: Expressões}
+% ----------------------------------------
+
+Expressões representam um conjunto de operações sobre os objetos do programa que podem ser definidas inline.
+Estas operações vão desde de soma à aplicação de função.
+É virtuoso começarmos, então, listando as precedências de cada operador (veja tab. \ref{tab:prec}). 
+
+
+\begin{table}[ht] % ======================== TABLE ========================
+\footnotesize
+\centering
+\begin{tabular}{ccl}
+\toprule
+Operador            & Precedência       & Associatividade \\
+\midrule
+\( || \) & 0 & Direita \\
+\midrule
+\( \&\& \) & 1 & Direita \\
+\midrule
+\( == \) & 2 & Não-associativo \\
+\( != \) \\
+\( < \) \\
+\( <= \) \\
+\( > \) \\
+\( >= \) \\
+\midrule
+\( + \) & 3 & Esquerda \\
+\( - \) \\
+\midrule
+\( * \) & 4 & Esquerda \\
+\( \div \) \\
+\( \% \) \\
+\midrule
+\( ** \) & 5 & Direita \\
+\midrule
+\( ++ \) & 6 & Não-associativo \\
+\( -- \) \\
+\bottomrule
+\addlinespace[1ex]
+\end{tabular}
+%
+\caption{
+Precedência e associatividade dos operadores.
+Quanto maior, maior a precedência.
+}
+\label{tab:prec}
+\end{table} % ======================== TABLE ========================
+
+
+
+Do que segue, a gramática para expressões fica\footnote{Inspirada na tablea de precedência de C: \href{https://www.ime.usp.br/~pf/algoritmos/apend/precedence.html}{Tabela de Precedência em C}.}:
+
+\footnotesize
+
+\begin{align}
+    E               &\lra E_0                                                                       \label{eq:gr:E} \\
+    E^*             &\lra \lambda \mid E                                                            \label{eq:gr:E-star} \\
+    E_X             &\lra X \mid I \; ( \; A \; ) \mid I \; \{ \; A \: \} \mid \;\; [ \; A \; ]     \label{eq:gr:E-X} \\
+    A               &\lra \lambda \mid A'                                                           \label{eq:gr:A} \\
+    A'              &\lra E_X \mid E_X \; \textbf{,} \; A'                                          \label{eq:gr:A-prime} \\
+    E_0             &\lra E_1 \mid E_0 \; Op_0 \; E_1 \\ 
+    E_1             &\lra E_2 \mid E_1 \; Op_1 \; E_2 \\
+    E_2             &\lra E_3 \mid E_2 \; Op_2 \; E_3 \\
+    E_3             &\lra E_4 \mid E_3 \; Op_3 \; E_4  \\
+    E_4             &\lra E_5 \mid  E_4 \; Op_4 \; E_5 \mid UOp_3 \; E_3 \\
+    E_5             &\lra E_6 \mid E_5 \; Op_5 \; E_6 \\
+    E_6             &\lra E_7 \mid E_7 \mid IncrOp \; E_6 \\
+    E_7             &\lra E_X \mid \; ( \; E_0 \; ) \mid E_7 \; IncrOp \\
+    Op_0            &\lra \; || \\
+    Op_1            &\lra \&\& \\
+    Op_2            &\lra \; == \; \mid \; != \; \mid \; < \; \mid \; <= \; \mid \; > \; \mid \; >= \; \\
+    Op_3            &\lra + \mid - \\
+    UOp_3           &\lra + \mid - \\
+    Op_4            &\lra * \mid \div \mid \% \\
+    Op_5            &\lra ** \\
+    IncrOp          &\lra ++ \mid --
+\end{align}
+
+\normalsize
+
+Neste caso, resolveu-se a precedência e a recursão à esquerda expandindo-se as regras da expressão.
+
+
+% ---------------------------------------------
+\subsubsection{Gramática: Variáveis e Literais}
+% ---------------------------------------------
+
+\footnotesize
+
+\begin{align}
+    V               &\lra I \; T_S                                  \label{eq:gr:V} \\
+    V^*             &\lra I \; T_S^* \\
+    T_S             &\lra \textbf{:} \;\; T                         \label{eq:gr:T-S-prime} \\
+    T_S^*           &\lra \lambda \mid T_S                          \label{eq:gr:T-S-prime-star} \\
+    X               &\lra X_A \mid L \\
+    X_A             &\lra I \; X_I' \\
+    X_A'            &\lra \lambda \mid I \; X_A' \mid \; \textbf{.} \; I \; X_A' \mid [ \; E \; ] \; X_A'
+\end{align}
+
+\normalsize
+
+Neste caso, \( X \) representa valor literal (\( L \)) ou referência \( X_A \).
+Aqui, por referência entende-se ``acesso à variável ou memória''.
+
+
+% ------------------------------
+\subsubsection{Gramática: Tipos}
+% ------------------------------
+
+\footnotesize
+\begin{align}
+    t               &\lra I \mid \textbf{int} \mid \textbf{float} \mid \textbf{string} \mid \textbf{bool} \label{eq:gr:t}\\
+    T               &\lra t \mid t \; \hat T_I \mid ( \; \hat{T} \; ) \; \rightarrow \; T   \label{eq:gr:T}\\
+    \hat T          &\lra \lambda \mid \hat T'              \label{eq:gr:T-hat} \\
+    \hat T'         &\lra T \mid \hat T' \; \textbf{,} \; T \label{eq:gr:T-hat-prime} \\
+    \hat T_I        &\lra [ E^* ] \mid \hat T_I \; T_I      \label{eq:gr:T-I-hat} \\
+    T_I             &\lra [ \; E \; ]                       \label{eq:gr:T-I} \\
+\end{align}
+\normalsize
+
+
+% -------------------------------
+\subsubsection{Gramática: Básico}
+% -------------------------------
+
+\footnotesize
+\begin{align}
+    I               &\lra \sigma I' \\
+    I'              &\lra \lambda \mid \sigma I' \mid \pi I' \\
+    \pi             &\lra 0 \mid 1 \mid 2 \mid 3 \mid 4 \mid 5 \mid 6 \mid 7 \mid 8 \mid 9 \\
+    \sigma          &\lra a-z \mid A-Z \mid \text{\_} \\
+    L               &\lra b \mid i \mid f \mid s \\
+    b               &\lra \textbf{true} \mid \textbf{false} \\
+    i               &\lra \text{INTEGER} \\
+    f               &\lra \text{FLOAT} \\
+    s               &\lra \text{STRING} \\
+\end{align}
+
+\normalsize
+Aqui, as regras \( i \), \( f \) e \( s \) expandem conforme suas expressões regulares.
+
+
+
+\begin{table}[ht] % ======================== TABLE ========================
+\centering
+\begin{tabular}{lp{10cm}p{2cm}}
+\toprule
+Símbolo(s)              & Significado                                       & Regras \\
+\midrule % ------------------------------------------------------------------------
+\( P \)                 & Programa. Variável de partida.                    & \ref{eq:gr:P} \\
+\( D \)                 & Definição (global).                               & \ref{eq:gr:D} \\
+\( F \)                 & (Def. de) Função.                                 & \ref{eq:gr:F} \\
+\( Pm, Pm' \)           & Parâmetros de função.                             & \ref{eq:gr:Pm}, \ref{eq:gr:Pm'} \\
+\( \hat{G} \)           & Sequência de variáveis de tipo: \( I^{+} \).      & \ref{eq:gr:G-hat} \\
+\( \hat{C} \)           & Sequência de comandos.                            & \ref{eq:gr:F}, \ref{eq:gr:C-hat}, \ref{eq:gr:C-f}, \ref{eq:gr:C-f-not} \\
+\( C \)                 & Comando (instrução dentro do escopo de função.)   & \ref{eq:gr:C}, \ref{eq:gr:C-hat} \\
+\( Atr \)               & Comando de atribuição.                            & \ref{eq:gr:C} \\
+\( Atr_D \)             & Comando de atribuição por definição.              & \ref{eq:gr:Atr} \\
+\( Atr_R \)             & Comando de (re-)atribuição.                       & \ref{eq:gr:Atr} \\
+\( C_f \)               & Controle de fluxo. ``Ifs''.                       & \ref{eq:gr:C} \\
+\( \overline{C_f} \)    & (Contra) Controle de fluxo. ``Elses''.            & \ref{eq:gr:C-f}, \ref{eq:gr:C-f} \\
+\( R \)                 & Laços de repetição.                               & \ref{eq:gr:C} \\
+\( St \)                & (Def. de) Estruturas                              & \ref{eq:gr:D} \\
+\( \hat V \)            & Sequência de declaração de variáveis.             & \ref{eq:gr:St}, \ref{eq:gr:V-hat} \\
+\( E_R \)               & Comando de início do laço \textbf{for}.           & \ref{eq:gr:R}, \ref{eq:gr:E}, \ref{eq:gr:E-R} \\
+\midrule % ------------------------------------------------------------------------
+\( E \)                 & Expressão.                                        & \ref{eq:gr:E-star}, \ref{eq:gr:R} \ref{eq:gr:E-R} \\
+\( E^* \)               & Expressão opcionais (anulável).                   & \ref{eq:gr:R} \\
+\( A, A' \)             & Lista de argumentos.                              & \ref{eq:gr:E-X} \ref{eq:gr:A}, \ref{eq:gr:A-prime} \\
+\( E_X \)               & Valor de expressão.                               & \ref{eq:gr:A-prime} \\
+\midrule % ------------------------------------------------------------------------
+\( V \)                 & Declaração de variável.                           & \ref{eq:gr:V-hat}, \ref{eq:gr:Atr-D}, \ref{eq:gr:E-R} \\
+\( V^* \)               & Declaração de variável com especificação opcional de tipo.       & \ref{eq:gr:Pm'} \\
+\( T_S^{*} \)           & Especificação de tipo (opcional).                 & \ref{eq:gr:F}, \ref{eq:gr:V} \\
+\( T_S \)               & Especificação de tipo.                            & \ref{eq:gr:F}, \ref{eq:gr:V} \\
+\( X \)                 & Valor.                                            & \ref{eq:gr:F}, \ref{eq:gr:V} \\
+\( X_A \)               & Acesso de variável.                               & \ref{eq:gr:F}, \ref{eq:gr:V} \\
+\( L \)                 & Valor literal.                                    & \ref{eq:gr:F}, \ref{eq:gr:V} \\
+\( I \)                 & Identificador, ou nome dos símbolos.              & \ref{eq:gr:F}, \ref{eq:gr:G-hat}, \ref{eq:gr:Atr-D} \\
+\( t \)                 & Tipo base.                                        & \ref{eq:gr:t}, \ref{eq:gr:T}  \\
+\( T \)                 & Tipo.                                             & \ref{eq:gr:T}, \ref{eq:gr:T-hat-prime} \\
+\( \hat T, \hat T' \)   & Lista de tipos.                                   & \ref{eq:gr:T}, \ref{eq:gr:T-hat-prime}, \ref{eq:gr:T-hat-prime} \\
+\( \hat T_I  \)         & Lista de índices de tipos.                        & \ref{eq:gr:T}, \ref{eq:gr:T-I-hat} \\
+\( T_I  \)              & Índice de tipo.                                   & \ref{eq:gr:T-I-hat} \\
+\bottomrule
+\addlinespace[1ex]
+\end{tabular}
+%
+\caption{
+Resumo da notação na gramática.
+}
+\end{table} % ======================== TABLE ========================
+
+
+
+
+
+
+
+
+
+%\input{sections/methodology/syntax} % tanto faz. usa só quando precisar. não vai ficar tão grande mesmo...
+
+
+\clearpage
+% ========================================
+\subsection{Sistema de tipos}
+% ========================================
+%\input{sections/methodology/type_system}
+
+Aqui discutiremos como os tipos foram organizados, em Haskell, para o desenvolvimento deste trabalho.
+
+% ----------------------------------------
+\subsubsection{Tokens} \label{subsubsec:types_tokens}
+% ----------------------------------------
+Para começar, com respeito ao token, temos dois tipos; 
+a saber: 
+\begin{lstlisting}[language=Haskell, numbers=none]
+data Token = Token {
+    pos :: (Int, Int),
+    lexeme :: Lexeme
+} deriving (Eq, Ord, Show, Read)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Haskell, numbers=none]
+data Lexeme = 
+    -- palavras chave.
+    T_Func |
+    ...
+
+    -- tipos palavra-chave.
+    T_TypeVoid |
+    ...
+
+    -- identificadores e literais.
+    T_Identifier String |
+    T_Integral Integer |
+    ...
+
+    -- fechamento.
+    T_LParenthesis |
+    ...
+
+    -- operadores
+    T_Plus
+    ...
+
+    -- outros
+    T_Dot |
+    T_Comma |
+    ...
+
+    T_EOF
+\end{lstlisting}
+
+Um token é uma composição de uma posição e um lexema;
+a posição é um tupla de dois inteiros indicando a linha e a coluna, respectivamente.
+O lexema representa uma estrutura léxica da linguagem.
+
+% ----------------------------------------
+\subsubsection{Árvore Sintática} \label{subsubsec:types_ir}
+% ----------------------------------------
+Para a árvore de sintaxe abstrata, define-se os seguintes tipos auto-explicativos:
+\begin{lstlisting}[language=Haskell, numbers=none]
+data IR_Program = Program [IR_Statement]
+
+data IR_Statement = FuncDef { ... } | StructDef { ... }
+
+data IR_Command = 
+    VarDef IR_Var IR_Expression | 
+    Assignment IR_VarAccess IR_Expression | 
+    Return IR_Expression | 
+    If IR_Expression [IR_Command] [IR_Command] | 
+    While IR_Expression [IR_Command] | 
+    For IR_Command IR_Expression IR_Expression [IR_Command] | 
+    CmdExpression IR_Expression
+
+data IR_Var = VarDecl Identifier IR_Type
+
+data IR_VarAccess = 
+    VarAccess Identifier IR_VarAccess | 
+    VarAccessIndex IR_Expression IR_VarAccess | 
+    VarAccessNothing
+
+data IR_Type = TypeVoid | TypeBool | TypeInt | TypeFloat | TypeString | TypeArray IR_Type [IR_Expression] | TypeFunction IR_Type IR_Type | TypeGeneric Identifier
+
+data IR_Expression = 
+    ExpNothing |
+    ExpVariable     IR_VarAccess |
+    ExpLitInteger   Integer |
+    ExpLitFloating  Double |
+    ExpLitBoolean   Bool |
+    ExpLitString    String |
+    
+    ExpSum          IR_Expression IR_Expression |
+    ExpSub          IR_Expression IR_Expression |
+    ExpMul          IR_Expression IR_Expression |
+    ExpDiv          IR_Expression IR_Expression |
+    ExpIntDiv       IR_Expression IR_Expression |
+    ExpMod          IR_Expression IR_Expression |
+    ExpPow          IR_Expression IR_Expression |
+    ExpNegative     IR_Expression |
+    ExpAnd          IR_Expression IR_Expression |
+    ExpOr           IR_Expression IR_Expression |
+    ExpEq           IR_Expression IR_Expression |
+    ExpNeq          IR_Expression IR_Expression |
+    ExpGt           IR_Expression IR_Expression |
+    ExpGeq          IR_Expression IR_Expression |
+    ExpLt           IR_Expression IR_Expression |
+    ExpLeq          IR_Expression IR_Expression |
+    ExpLIncr IR_Expression |
+    ExpRIncr IR_Expression |
+    ExpLDecr IR_Expression |
+    ExpRDecr IR_Expression |
+    
+    ExpFCall Identifier [IR_Expression] |
+    ExpStructInstance Identifier [IR_Expression] |
+    ExpArrayInstancing [IR_Expression] |
+    ExpNew IR_Type
+\end{lstlisting}
+
+A composição de tais tipos possibilita a construção de uma árvore de derivação completa durante a análise sintática, conforme apresentaremos adiante (\ref{subsec:syntactic_analysis}).
+
+
+% ----------------------------------------
+\subsubsection{Lexer} \label{subsubsec:types_lexer}
+% ----------------------------------------
+
+A seguinte função para tokenização da string do programa é definida:
+
+\begin{lstlisting}[language=Haskell, numbers=none]
+lexer :: String -> Either String [Token]
+\end{lstlisting}
+
+A primeira entrada do \texttt{Either} representa erro e, a segunda, a lista de tokens tokenizados.
+Por praticidade (principalmente para os testes), define-se também
+\begin{lstlisting}[language=Haskell, numbers=none]
+lexer_plain :: String -> [Lexeme]
+lexer_plain s = case lexer s of
+    Left _          -> []
+    Right tokens    -> map lexeme tokens 
+\end{lstlisting}
+
+
+% ----------------------------------------
+\subsubsection{Parser} \label{subsubsec:types_parser}
+% ----------------------------------------
+
+O parser é: 
+\begin{lstlisting}[language=Haskell, numbers=none]
+parse_sl_alex :: Alex IR_Program
+parse_sl_exp_alex :: Alex IR_Expression
+
+parse_sl :: String -> Either String IR_Program
+parse_sl_exp :: String -> Either String IR_Expression
+\end{lstlisting}
+onde \texttt{Alex} é uma instancia de mônada definida pelo gerador de analisador léxico Alex. Nesta definição, \texttt{parse\_sl} é a função que opera a análise sintática da lista de tokens retornadas pela chamada da análise léxica sobre a string de entrada. A primeira entrada do \texttt{Either} é representa o erro propagado como uma string, e a segunda, a árvore sintática construída.
+
+Aqui, \texttt{parse\_sl\_exp} foi também definida para a simplificação dos testes direcionados especificamente à análise sintática de expressões.
+
+
+% ----------------------------------------
+\subsubsection{Pretty} \label{subsubsec:types_pretty}
+% ----------------------------------------
+
+Para a representação legível da árvore sintática obtida após o parsing dos programas de entrada, define-se a operação pretty. 
+O pretty é definido como uma classe de tipo que define a seguinte função:
+
+\begin{lstlisting}[language=Haskell, numbers=none]
+class Pretty t where
+    pretty :: t -> PrettyContext ()
+\end{lstlisting}
+onde \texttt{PrettyContext} é tipo que define o contexto de operações pretty, para o qual são definidas as suas instâncias de funtor, funtor aplicativo, e mônada. Essencialmente, \texttt{PrettyContext} define uma transição de estados que mantém a informação do nível de indentação corrente para a construção da string de saída. O valor propagado nas transições do pretty context é uma tupla que informa o estado atual, a string construída e o restante da entrada a ser processada.
+
+\begin{lstlisting}[language=Haskell, numbers=none]
+newtype PrettyContext t = PC {
+    pc_transition :: PrettyState -> (PrettyState, String, t)
+}
+
+data PrettyState = PrettyState {    
+    identation_level :: Int
+}
+\end{lstlisting}
+
+
+
+% ----------------------------------------
+\subsubsection{Erros} \label{subsubsec:types_error}
+% ----------------------------------------
+
+A fim de  garantir diagnósticos mais precisos e facilitar a depuração dos códigos SL compilados, definimos uma separação lógica dos possíveis erros gerados durante a compilação. Cada tipo de erro definido corresponde ao momento em que foi gerado segundo o pipeline do compilador, conforme pode-se observar:
+
+\begin{lstlisting}[language=Haskell, numbers=none]
+newtype SrcPos = SrcPos (Int, Int)
+
+data ErrorType = 
+    LexicalError |
+    SyntaxError |
+    SemanticalError
+
+
+data Error = Error {
+    error_type :: ErrorType,
+    error_msg :: String,
+    error_pos :: SrcPos
+}
+\end{lstlisting}
+
+Como é de se esperar, foram também definidas as instâncias de \texttt{Show} para cada um deles, na intenção de garantir maior qualidade para as mensagens de erro devolvidas para o usuário.
+
+
+% ========================================
+\subsection{Inferência de tipos}
+% ========================================
+
+Pendente \dots
+
+
+
+% ========================================
+\subsection{Semântica operacional}
+% ========================================
+
+Pendente \dots

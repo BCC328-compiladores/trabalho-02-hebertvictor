@@ -6,7 +6,7 @@ services:
     container_name: sl-assignment
     volumes:
       # Mount your project directory to /workspace in the container
-      - ./workspace:/workspace
+      - ./:/workspace
       # Persist cabal and ghcup data
       - haskell-cabal-data:/root/.cabal
       - haskell-ghcup-data:/root/.ghcup

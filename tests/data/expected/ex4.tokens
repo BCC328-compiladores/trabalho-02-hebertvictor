@@ -1,0 +1,104 @@
+Token {pos = SrcPos (7,1), lexeme = T_Func}
+Token {pos = SrcPos (7,6), lexeme = T_Identifier "calculateBMI"}
+Token {pos = SrcPos (7,18), lexeme = T_LParenthesis}
+Token {pos = SrcPos (7,19), lexeme = T_Identifier "weight"}
+Token {pos = SrcPos (7,26), lexeme = T_Colon}
+Token {pos = SrcPos (7,28), lexeme = T_TypeFloat}
+Token {pos = SrcPos (7,33), lexeme = T_Comma}
+Token {pos = SrcPos (7,35), lexeme = T_Identifier "height"}
+Token {pos = SrcPos (7,42), lexeme = T_Colon}
+Token {pos = SrcPos (7,44), lexeme = T_TypeFloat}
+Token {pos = SrcPos (7,49), lexeme = T_RParenthesis}
+Token {pos = SrcPos (7,51), lexeme = T_Colon}
+Token {pos = SrcPos (7,53), lexeme = T_TypeFloat}
+Token {pos = SrcPos (7,59), lexeme = T_LBrace}
+Token {pos = SrcPos (8,5), lexeme = T_Return}
+Token {pos = SrcPos (8,12), lexeme = T_Identifier "weight"}
+Token {pos = SrcPos (8,19), lexeme = T_Divide}
+Token {pos = SrcPos (8,21), lexeme = T_LParenthesis}
+Token {pos = SrcPos (8,22), lexeme = T_Identifier "height"}
+Token {pos = SrcPos (8,29), lexeme = T_Times}
+Token {pos = SrcPos (8,31), lexeme = T_Identifier "height"}
+Token {pos = SrcPos (8,37), lexeme = T_RParenthesis}
+Token {pos = SrcPos (8,38), lexeme = T_Semicolon}
+Token {pos = SrcPos (9,1), lexeme = T_RBrace}
+Token {pos = SrcPos (12,1), lexeme = T_Func}
+Token {pos = SrcPos (12,6), lexeme = T_Identifier "isAdult"}
+Token {pos = SrcPos (12,13), lexeme = T_LParenthesis}
+Token {pos = SrcPos (12,14), lexeme = T_Identifier "age"}
+Token {pos = SrcPos (12,18), lexeme = T_Colon}
+Token {pos = SrcPos (12,20), lexeme = T_TypeInt}
+Token {pos = SrcPos (12,23), lexeme = T_RParenthesis}
+Token {pos = SrcPos (12,25), lexeme = T_Colon}
+Token {pos = SrcPos (12,27), lexeme = T_TypeBool}
+Token {pos = SrcPos (12,32), lexeme = T_LBrace}
+Token {pos = SrcPos (13,5), lexeme = T_Return}
+Token {pos = SrcPos (13,12), lexeme = T_Identifier "age"}
+Token {pos = SrcPos (13,16), lexeme = T_ExpGeq}
+Token {pos = SrcPos (13,19), lexeme = T_Integral 18}
+Token {pos = SrcPos (13,21), lexeme = T_Semicolon}
+Token {pos = SrcPos (14,1), lexeme = T_RBrace}
+Token {pos = SrcPos (17,1), lexeme = T_Func}
+Token {pos = SrcPos (17,6), lexeme = T_Identifier "main"}
+Token {pos = SrcPos (17,10), lexeme = T_LParenthesis}
+Token {pos = SrcPos (17,11), lexeme = T_RParenthesis}
+Token {pos = SrcPos (17,13), lexeme = T_Colon}
+Token {pos = SrcPos (17,15), lexeme = T_TypeVoid}
+Token {pos = SrcPos (17,20), lexeme = T_LBrace}
+Token {pos = SrcPos (18,5), lexeme = T_Let}
+Token {pos = SrcPos (18,9), lexeme = T_Identifier "bmi"}
+Token {pos = SrcPos (18,13), lexeme = T_Colon}
+Token {pos = SrcPos (18,15), lexeme = T_TypeFloat}
+Token {pos = SrcPos (18,21), lexeme = T_Equal}
+Token {pos = SrcPos (18,23), lexeme = T_Identifier "calculateBMI"}
+Token {pos = SrcPos (18,35), lexeme = T_LParenthesis}
+Token {pos = SrcPos (18,36), lexeme = T_Floating 70.5}
+Token {pos = SrcPos (18,40), lexeme = T_Comma}
+Token {pos = SrcPos (18,42), lexeme = T_Floating 1.75}
+Token {pos = SrcPos (18,46), lexeme = T_RParenthesis}
+Token {pos = SrcPos (18,47), lexeme = T_Semicolon}
+Token {pos = SrcPos (19,5), lexeme = T_Let}
+Token {pos = SrcPos (19,9), lexeme = T_Identifier "adult"}
+Token {pos = SrcPos (19,15), lexeme = T_Colon}
+Token {pos = SrcPos (19,17), lexeme = T_TypeBool}
+Token {pos = SrcPos (19,22), lexeme = T_Equal}
+Token {pos = SrcPos (19,24), lexeme = T_Identifier "isAdult"}
+Token {pos = SrcPos (19,31), lexeme = T_LParenthesis}
+Token {pos = SrcPos (19,32), lexeme = T_Integral 20}
+Token {pos = SrcPos (19,34), lexeme = T_RParenthesis}
+Token {pos = SrcPos (19,35), lexeme = T_Semicolon}
+Token {pos = SrcPos (21,5), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (21,10), lexeme = T_LParenthesis}
+Token {pos = SrcPos (21,11), lexeme = T_Identifier "bmi"}
+Token {pos = SrcPos (21,14), lexeme = T_RParenthesis}
+Token {pos = SrcPos (21,15), lexeme = T_Semicolon}
+Token {pos = SrcPos (22,5), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (22,10), lexeme = T_LParenthesis}
+Token {pos = SrcPos (22,11), lexeme = T_Identifier "adult"}
+Token {pos = SrcPos (22,16), lexeme = T_RParenthesis}
+Token {pos = SrcPos (22,17), lexeme = T_Semicolon}
+Token {pos = SrcPos (24,5), lexeme = T_If}
+Token {pos = SrcPos (24,8), lexeme = T_LParenthesis}
+Token {pos = SrcPos (24,9), lexeme = T_Identifier "adult"}
+Token {pos = SrcPos (24,15), lexeme = T_ExpAnd}
+Token {pos = SrcPos (24,18), lexeme = T_Identifier "bmi"}
+Token {pos = SrcPos (24,22), lexeme = T_RAngle}
+Token {pos = SrcPos (24,24), lexeme = T_Floating 25.0}
+Token {pos = SrcPos (24,28), lexeme = T_RParenthesis}
+Token {pos = SrcPos (24,30), lexeme = T_LBrace}
+Token {pos = SrcPos (25,9), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (25,14), lexeme = T_LParenthesis}
+Token {pos = SrcPos (25,15), lexeme = T_String "adulto com sobrepeso"}
+Token {pos = SrcPos (25,37), lexeme = T_RParenthesis}
+Token {pos = SrcPos (25,38), lexeme = T_Semicolon}
+Token {pos = SrcPos (26,5), lexeme = T_RBrace}
+Token {pos = SrcPos (26,7), lexeme = T_Else}
+Token {pos = SrcPos (26,12), lexeme = T_LBrace}
+Token {pos = SrcPos (27,9), lexeme = T_Identifier "print"}
+Token {pos = SrcPos (27,14), lexeme = T_LParenthesis}
+Token {pos = SrcPos (27,15), lexeme = T_String "condi\231\227o normal"}
+Token {pos = SrcPos (27,32), lexeme = T_RParenthesis}
+Token {pos = SrcPos (27,33), lexeme = T_Semicolon}
+Token {pos = SrcPos (28,5), lexeme = T_RBrace}
+Token {pos = SrcPos (29,1), lexeme = T_RBrace}
+Token {pos = SrcPos (30,1), lexeme = T_EOF}
