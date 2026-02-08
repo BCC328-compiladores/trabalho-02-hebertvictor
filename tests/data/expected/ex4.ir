@@ -2,86 +2,111 @@ Program [
     FuncDef {
         symbol_name = "calculateBMI",
         function_rtype = TypeFloat,
-        function_parameters = [
-            VarDecl "weight" TypeFloat,
-            VarDecl "height" TypeFloat
-        ],
+        function_parameters =
+            [ VarDecl "weight" TypeFloat,
+              VarDecl "height" TypeFloat ],
         function_gtypes = [],
-        function_body = [
-            Return
-                (ExpDiv
-                    (ExpVariable (VarAccess "weight" VarAccessNothing))
-                    (ExpMul
-                        (ExpVariable (VarAccess "height" VarAccessNothing))
-                        (ExpVariable (VarAccess "height" VarAccessNothing))))
-        ],
+        function_body =
+            [
+                LC {
+                    lc_cmd =
+                        Return
+                            (ExpDiv
+                                (ExpVariable (VarAccess "weight" VarAccessNothing))
+                                (ExpMul
+                                    (ExpVariable (VarAccess "height" VarAccessNothing))
+                                    (ExpVariable (VarAccess "height" VarAccessNothing)))),
+                    lc_pos = SrcPos (8, 5)
+                }
+            ],
         symbol_pos = SrcPos (7, 6)
     },
-
     FuncDef {
         symbol_name = "isAdult",
         function_rtype = TypeBool,
-        function_parameters = [
-            VarDecl "age" TypeInt
-        ],
+        function_parameters =
+            [ VarDecl "age" TypeInt ],
         function_gtypes = [],
-        function_body = [
-            Return
-                (ExpGeq
-                    (ExpVariable (VarAccess "age" VarAccessNothing))
-                    (ExpLitInteger 18))
-        ],
+        function_body =
+            [
+                LC {
+                    lc_cmd =
+                        Return
+                            (ExpGeq
+                                (ExpVariable (VarAccess "age" VarAccessNothing))
+                                (ExpLitInteger 18)),
+                    lc_pos = SrcPos (13, 5)
+                }
+            ],
         symbol_pos = SrcPos (12, 6)
     },
-
     FuncDef {
         symbol_name = "main",
         function_rtype = TypeVoid,
         function_parameters = [],
         function_gtypes = [],
-        function_body = [
-            VarDef
-                (VarDecl "bmi" TypeFloat)
-                (ExpFCall "calculateBMI" [
-                    ExpLitFloating 70.5,
-                    ExpLitFloating 1.75
-                ]),
-
-            VarDef
-                (VarDecl "adult" TypeBool)
-                (ExpFCall "isAdult" [
-                    ExpLitInteger 20
-                ]),
-
-            CmdExpression
-                (ExpFCall "print" [
-                    ExpVariable (VarAccess "bmi" VarAccessNothing)
-                ]),
-
-            CmdExpression
-                (ExpFCall "print" [
-                    ExpVariable (VarAccess "adult" VarAccessNothing)
-                ]),
-
-            If
-                (ExpAnd
-                    (ExpVariable (VarAccess "adult" VarAccessNothing))
-                    (ExpGt
-                        (ExpVariable (VarAccess "bmi" VarAccessNothing))
-                        (ExpLitFloating 25.0)))
-                [
-                    CmdExpression
-                        (ExpFCall "print" [
-                            ExpLitString "adulto com sobrepeso"
-                        ])
-                ]
-                [
-                    CmdExpression
-                        (ExpFCall "print" [
-                            ExpLitString "condição normal"
-                        ])
-                ]
-        ],
+        function_body =
+            [
+                LC {
+                    lc_cmd =
+                        VarDef
+                            (VarDecl "bmi" TypeFloat)
+                            (ExpFCall "calculateBMI"
+                                [ ExpLitFloating 70.5,
+                                  ExpLitFloating 1.75 ]),
+                    lc_pos = SrcPos (18, 47)
+                },
+                LC {
+                    lc_cmd =
+                        VarDef
+                            (VarDecl "adult" TypeBool)
+                            (ExpFCall "isAdult"
+                                [ ExpLitInteger 20 ]),
+                    lc_pos = SrcPos (19, 35)
+                },
+                LC {
+                    lc_cmd =
+                        CmdExpression
+                            (ExpFCall "print"
+                                [ ExpVariable (VarAccess "bmi" VarAccessNothing) ]),
+                    lc_pos = SrcPos (21, 15)
+                },
+                LC {
+                    lc_cmd =
+                        CmdExpression
+                            (ExpFCall "print"
+                                [ ExpVariable (VarAccess "adult" VarAccessNothing) ]),
+                    lc_pos = SrcPos (22, 17)
+                },
+                LC {
+                    lc_cmd =
+                        If
+                            (ExpAnd
+                                (ExpVariable (VarAccess "adult" VarAccessNothing))
+                                (ExpGt
+                                    (ExpVariable (VarAccess "bmi" VarAccessNothing))
+                                    (ExpLitFloating 25.0)))
+                            [
+                                LC {
+                                    lc_cmd =
+                                        CmdExpression
+                                            (ExpFCall "print"
+                                                [ ExpLitString "adulto com sobrepeso" ]),
+                                    lc_pos = SrcPos (25, 38)
+                                }
+                            ]
+                            [
+                                LC {
+                                    lc_cmd =
+                                        CmdExpression
+                                            (ExpFCall "print"
+                                                [ ExpLitString "condi\231\227o normal" ]),
+                                    lc_pos = SrcPos (27, 33)
+                                }
+                            ],
+                    lc_pos = SrcPos (24, 5)
+                }
+            ],
         symbol_pos = SrcPos (17, 6)
     }
 ]

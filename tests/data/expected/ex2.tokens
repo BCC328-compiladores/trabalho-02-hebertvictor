@@ -2,17 +2,17 @@ Token {pos = SrcPos (7,1), lexeme = T_Struct}
 Token {pos = SrcPos (7,8), lexeme = T_Identifier "Person"}
 Token {pos = SrcPos (7,15), lexeme = T_LBrace}
 Token {pos = SrcPos (8,5), lexeme = T_Identifier "name"}
-Token {pos = SrcPos (8,10), lexeme = T_Colon}
-Token {pos = SrcPos (8,12), lexeme = T_TypeString}
-Token {pos = SrcPos (8,18), lexeme = T_Semicolon}
+Token {pos = SrcPos (8,13), lexeme = T_Colon}
+Token {pos = SrcPos (8,15), lexeme = T_TypeString}
+Token {pos = SrcPos (8,21), lexeme = T_Semicolon}
 Token {pos = SrcPos (9,5), lexeme = T_Identifier "age"}
-Token {pos = SrcPos (9,9), lexeme = T_Colon}
-Token {pos = SrcPos (9,11), lexeme = T_TypeInt}
-Token {pos = SrcPos (9,14), lexeme = T_Semicolon}
+Token {pos = SrcPos (9,13), lexeme = T_Colon}
+Token {pos = SrcPos (9,15), lexeme = T_TypeInt}
+Token {pos = SrcPos (9,18), lexeme = T_Semicolon}
 Token {pos = SrcPos (10,5), lexeme = T_Identifier "height"}
-Token {pos = SrcPos (10,12), lexeme = T_Colon}
-Token {pos = SrcPos (10,14), lexeme = T_TypeFloat}
-Token {pos = SrcPos (10,19), lexeme = T_Semicolon}
+Token {pos = SrcPos (10,13), lexeme = T_Colon}
+Token {pos = SrcPos (10,15), lexeme = T_TypeFloat}
+Token {pos = SrcPos (10,20), lexeme = T_Semicolon}
 Token {pos = SrcPos (11,1), lexeme = T_RBrace}
 Token {pos = SrcPos (14,1), lexeme = T_Func}
 Token {pos = SrcPos (14,6), lexeme = T_Identifier "main"}

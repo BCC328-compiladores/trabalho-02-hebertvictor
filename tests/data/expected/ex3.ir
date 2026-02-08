@@ -2,96 +2,151 @@ Program [
     FuncDef {
         symbol_name = "reverse",
         function_rtype = TypeArray TypeInt [ExpNothing],
-        function_parameters = [
-            VarDecl "arr" (TypeArray TypeInt [ExpNothing]),
-            VarDecl "size" TypeInt
-        ],
+        function_parameters =
+            [
+                VarDecl "arr" (TypeArray TypeInt [ExpNothing]),
+                VarDecl "size" TypeInt
+            ],
         function_gtypes = [],
-        function_body = [
-            VarDef
-                (VarDecl "result" (TypeArray TypeInt [ExpNothing]))
-                (ExpNew (TypeArray TypeInt [ExpVariable (VarAccess "size" VarAccessNothing)])),
-
-            VarDef (VarDecl "i" TypeInt) (ExpLitInteger 0),
-
-            While
-                (ExpLt
-                    (ExpVariable (VarAccess "i" VarAccessNothing))
-                    (ExpVariable (VarAccess "size" VarAccessNothing)))
-                [
-                    Assignment
-                        (VarAccess "result"
-                            (VarAccessIndex
+        function_body =
+            [
+                LC {
+                    lc_cmd =
+                        VarDef
+                            (VarDecl "result"
+                                (TypeArray TypeInt [ExpNothing]))
+                            (ExpNew
+                                (TypeArray TypeInt
+                                    [ ExpVariable (VarAccess "size" VarAccessNothing) ])),
+                    lc_pos = SrcPos (8, 39)
+                },
+                LC {
+                    lc_cmd =
+                        VarDef
+                            (VarDecl "i" TypeInt)
+                            (ExpLitInteger 0),
+                    lc_pos = SrcPos (10, 20)
+                },
+                LC {
+                    lc_cmd =
+                        While
+                            (ExpLt
                                 (ExpVariable (VarAccess "i" VarAccessNothing))
-                                VarAccessNothing))
-                        (ExpVariable
-                            (VarAccess "arr"
-                                (VarAccessIndex
-                                    (ExpSub
-                                        (ExpSub
-                                            (ExpVariable (VarAccess "size" VarAccessNothing))
-                                            (ExpVariable (VarAccess "i" VarAccessNothing)))
-                                        (ExpLitInteger 1))
-                                    VarAccessNothing))),
-
-                    Assignment
-                        (VarAccess "i" VarAccessNothing)
-                        (ExpSum
-                            (ExpVariable (VarAccess "i" VarAccessNothing))
-                            (ExpLitInteger 1))
-                ],
-
-            Return (ExpVariable (VarAccess "result" VarAccessNothing))
-        ],
+                                (ExpVariable (VarAccess "size" VarAccessNothing)))
+                            [
+                                LC {
+                                    lc_cmd =
+                                        Assignment
+                                            (VarAccess "result"
+                                                (VarAccessIndex
+                                                    (ExpVariable (VarAccess "i" VarAccessNothing))
+                                                    VarAccessNothing))
+                                            (ExpVariable
+                                                (VarAccess "arr"
+                                                    (VarAccessIndex
+                                                        (ExpSub
+                                                            (ExpSub
+                                                                (ExpVariable (VarAccess "size" VarAccessNothing))
+                                                                (ExpVariable (VarAccess "i" VarAccessNothing)))
+                                                            (ExpLitInteger 1))
+                                                        VarAccessNothing))),
+                                    lc_pos = SrcPos (12, 38)
+                                },
+                                LC {
+                                    lc_cmd =
+                                        Assignment
+                                            (VarAccess "i" VarAccessNothing)
+                                            (ExpSum
+                                                (ExpVariable (VarAccess "i" VarAccessNothing))
+                                                (ExpLitInteger 1)),
+                                    lc_pos = SrcPos (13, 18)
+                                }
+                            ],
+                    lc_pos = SrcPos (11, 5)
+                },
+                LC {
+                    lc_cmd =
+                        Return
+                            (ExpVariable (VarAccess "result" VarAccessNothing)),
+                    lc_pos = SrcPos (16, 5)
+                }
+            ],
         symbol_pos = SrcPos (7, 6)
     },
-
     FuncDef {
         symbol_name = "main",
         function_rtype = TypeVoid,
         function_parameters = [],
         function_gtypes = [],
-        function_body = [
-            VarDef
-                (VarDecl "original" (TypeArray TypeInt [ExpLitInteger 5]))
-                (ExpArrayInstancing [
-                    ExpLitInteger 1,
-                    ExpLitInteger 2,
-                    ExpLitInteger 3,
-                    ExpLitInteger 4,
-                    ExpLitInteger 5
-                ]),
-
-            VarDef
-                (VarDecl "reversed" (TypeArray TypeInt [ExpNothing]))
-                (ExpFCall "reverse" [
-                    ExpVariable (VarAccess "original" VarAccessNothing),
-                    ExpLitInteger 5
-                ]),
-
-            VarDef (VarDecl "j" TypeInt) (ExpLitInteger 0),
-
-            While
-                (ExpLt
-                    (ExpVariable (VarAccess "j" VarAccessNothing))
-                    (ExpLitInteger 5))
-                [
-                    CmdExpression
-                        (ExpFCall "print" [
-                            ExpVariable
-                                (VarAccess "reversed"
-                                    (VarAccessIndex
-                                        (ExpVariable (VarAccess "j" VarAccessNothing))
-                                        VarAccessNothing))
-                        ]),
-
-                    Assignment
-                        (VarAccess "j" VarAccessNothing)
-                        (ExpSum
-                            (ExpVariable (VarAccess "j" VarAccessNothing))
-                            (ExpLitInteger 1))
-                ]
-        ],
+        function_body =
+            [
+                LC {
+                    lc_cmd =
+                        VarDef
+                            (VarDecl "original"
+                                (TypeArray TypeInt [ExpLitInteger 5]))
+                            (ExpArrayInstancing
+                                [
+                                    ExpLitInteger 1,
+                                    ExpLitInteger 2,
+                                    ExpLitInteger 3,
+                                    ExpLitInteger 4,
+                                    ExpLitInteger 5
+                                ]),
+                    lc_pos = SrcPos (21, 44)
+                },
+                LC {
+                    lc_cmd =
+                        VarDef
+                            (VarDecl "reversed"
+                                (TypeArray TypeInt [ExpNothing]))
+                            (ExpFCall "reverse"
+                                [
+                                    ExpVariable (VarAccess "original" VarAccessNothing),
+                                    ExpLitInteger 5
+                                ]),
+                    lc_pos = SrcPos (22, 48)
+                },
+                LC {
+                    lc_cmd =
+                        VarDef
+                            (VarDecl "j" TypeInt)
+                            (ExpLitInteger 0),
+                    lc_pos = SrcPos (24, 20)
+                },
+                LC {
+                    lc_cmd =
+                        While
+                            (ExpLt
+                                (ExpVariable (VarAccess "j" VarAccessNothing))
+                                (ExpLitInteger 5))
+                            [
+                                LC {
+                                    lc_cmd =
+                                        CmdExpression
+                                            (ExpFCall "print"
+                                                [
+                                                    ExpVariable
+                                                        (VarAccess "reversed"
+                                                            (VarAccessIndex
+                                                                (ExpVariable (VarAccess "j" VarAccessNothing))
+                                                                VarAccessNothing))
+                                                ]),
+                                    lc_pos = SrcPos (26, 27)
+                                },
+                                LC {
+                                    lc_cmd =
+                                        Assignment
+                                            (VarAccess "j" VarAccessNothing)
+                                            (ExpSum
+                                                (ExpVariable (VarAccess "j" VarAccessNothing))
+                                                (ExpLitInteger 1)),
+                                    lc_pos = SrcPos (27, 18)
+                                }
+                            ],
+                    lc_pos = SrcPos (25, 5)
+                }
+            ],
         symbol_pos = SrcPos (20, 6)
     }
 ]

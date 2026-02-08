@@ -124,7 +124,7 @@ simple_specs = describe "Parsing simple functions" $ do
             function_parameters = [],
             function_gtypes     = [],
             function_body       = [
-                LC (VarDef (VarDecl "x" TypeInt) (ExpLitInteger 1)) (SrcPos (0, 0))
+                LC (VarDef (VarDecl "x" TypeInt) (ExpLitInteger 1)) (SrcPos (1, 41))
             ],
             symbol_pos          = SrcPos (1, 6)
         }])
@@ -137,7 +137,7 @@ simple_specs = describe "Parsing simple functions" $ do
             function_parameters = [],
             function_gtypes     = [],
             function_body       = [
-                LC (VarDef (VarDecl "x" TypeVoid) (ExpLitInteger 1)) (SrcPos (0, 0))
+                LC (VarDef (VarDecl "x" TypeVoid) (ExpLitInteger 1)) (SrcPos (1, 35))
             ],
             symbol_pos          = SrcPos (1, 6)
         }])
@@ -161,7 +161,7 @@ simple_specs = describe "Parsing simple functions" $ do
             function_parameters = [ VarDecl "x" (TypeGeneric "a") ],
             function_gtypes     = [ "a" ],
             function_body       = [
-                LC (VarDef (VarDecl "y" (TypeGeneric "a")) ExpNothing) (SrcPos (0, 0))
+                LC (VarDef (VarDecl "y" (TypeGeneric "a")) ExpNothing) (SrcPos (1, 48))
             ],
             symbol_pos          = SrcPos (1, 17)
         }])
@@ -174,8 +174,8 @@ simple_specs = describe "Parsing simple functions" $ do
             function_parameters = [ VarDecl "x" (TypeGeneric "a") ],
             function_gtypes     = [ "a", "b", "c" ],
             function_body       = [
-                LC (VarDef (VarDecl "y" (TypeGeneric "b")) ExpNothing) (SrcPos (0, 0)),
-                LC (VarDef (VarDecl "z" (TypeGeneric "c")) ExpNothing) (SrcPos (0, 0))
+                LC (VarDef (VarDecl "y" (TypeGeneric "b")) ExpNothing) (SrcPos (1, 52)),
+                LC (VarDef (VarDecl "z" (TypeGeneric "c")) ExpNothing) (SrcPos (1, 62))
             ],
             symbol_pos          = SrcPos (1, 21)
         }])
@@ -188,8 +188,8 @@ simple_specs = describe "Parsing simple functions" $ do
             function_parameters = [ VarDecl "x" (TypeGeneric "a") ],
             function_gtypes     = [ "a", "b", "c" ],
             function_body       = [
-                LC (VarDef (VarDecl "y" (TypeGeneric "b")) ExpNothing) (SrcPos (0, 0)),
-                LC (VarDef (VarDecl "z" (TypeGeneric "c")) ExpNothing) (SrcPos (0, 0))
+                LC (VarDef (VarDecl "y" (TypeGeneric "b")) ExpNothing) (SrcPos (1, 46)),
+                LC (VarDef (VarDecl "z" (TypeGeneric "c")) ExpNothing) (SrcPos (1, 54))
             ],
             symbol_pos          = SrcPos (1, 21)
         }])
@@ -220,7 +220,7 @@ cflx_specs = describe "Parsing Control Flux" $ do
             function_parameters = [],
             function_gtypes     = [],
             function_body       = [
-                LC (If (ExpLitBoolean True) [] []) (SrcPos (0, 0))
+                LC (If (ExpLitBoolean True) [] []) (SrcPos (1, 22))
             ],
             symbol_pos          = SrcPos (1, 6)
         }])
@@ -234,9 +234,9 @@ cflx_specs = describe "Parsing Control Flux" $ do
             function_gtypes     = [],
             function_body       = [
                 LC (If (ExpLitBoolean True) 
-                    [ LC (VarDef (VarDecl "x" TypeInt) ExpNothing) (SrcPos (0, 0)) ] 
-                    [ LC (VarDef (VarDecl "y" TypeInt) ExpNothing) (SrcPos (0, 0)) ]
-                    ) (SrcPos (0, 0))
+                    [ LC (VarDef (VarDecl "x" TypeInt) ExpNothing) (SrcPos (1, 44)) ] 
+                    [ LC (VarDef (VarDecl "y" TypeInt) ExpNothing) (SrcPos (1, 65)) ]
+                    ) (SrcPos (1, 22))
             ],
             symbol_pos          = SrcPos (1, 6)
         }])
@@ -250,11 +250,11 @@ cflx_specs = describe "Parsing Control Flux" $ do
             function_gtypes     = [],
             function_body       = [
                 LC (If (ExpAnd (ExpVariable $ VarAccess "a" VarAccessNothing) (ExpLitInteger 4))
-                [ LC (VarDef (VarDecl "x" TypeInt) ExpNothing) (SrcPos (0, 0)) ] 
+                [ LC (VarDef (VarDecl "x" TypeInt) ExpNothing) (SrcPos (1, 46)) ] 
                 [ LC (If (ExpLitBoolean True) 
-                    [ LC (VarDef (VarDecl "y" TypeInt) ExpNothing) (SrcPos (0, 0))] 
-                    [ LC (VarDef (VarDecl "z" TypeInt) ExpNothing) (SrcPos (0, 0))]) (SrcPos (0, 0)) ]
-                ) (SrcPos (0, 0))
+                    [ LC (VarDef (VarDecl "y" TypeInt) ExpNothing) (SrcPos (1, 73))] 
+                    [ LC (VarDef (VarDecl "z" TypeInt) ExpNothing) (SrcPos (1, 94))]) (SrcPos (1, 50)) ]
+                ) (SrcPos (1, 22))
             ],
             symbol_pos          = SrcPos (1, 6)
         }])
@@ -270,9 +270,9 @@ array_specs = describe "Parsing arrays" $ do
             function_parameters = [],
             function_gtypes     = [],
             function_body       = [
-                LC (VarDef (VarDecl "array" (TypeArray TypeInt [ExpNothing])) (ExpArrayInstancing [])) (SrcPos (0, 0)),
-                LC (VarDef (VarDecl "array1" (TypeArray TypeInt [(ExpLitInteger 3)])) (ExpArrayInstancing [ExpLitInteger 1, ExpLitInteger 2, ExpLitInteger 3])) (SrcPos (0, 0)),
-                LC (VarDef (VarDecl "array2" (TypeArray TypeInt [ExpNothing, (ExpLitInteger 2)])) (ExpArrayInstancing [(ExpArrayInstancing []), (ExpArrayInstancing [])])) (SrcPos (0, 0))
+                LC (VarDef (VarDecl "array" (TypeArray TypeInt [ExpNothing])) (ExpArrayInstancing [])) (SrcPos (1, 44)),
+                LC (VarDef (VarDecl "array1" (TypeArray TypeInt [(ExpLitInteger 3)])) (ExpArrayInstancing [ExpLitInteger 1, ExpLitInteger 2, ExpLitInteger 3])) (SrcPos (1, 78)),
+                LC (VarDef (VarDecl "array2" (TypeArray TypeInt [ExpNothing, (ExpLitInteger 2)])) (ExpArrayInstancing [(ExpArrayInstancing []), (ExpArrayInstancing [])])) (SrcPos (1, 112))
             ],
             symbol_pos          = SrcPos (1, 6)
         }])
@@ -294,6 +294,8 @@ read_expected_program filepath = do
 parse_and_compare_program :: FilePath -> FilePath -> IO ()
 parse_and_compare_program src src_ir = do
     parsed <- fparse src
+    print $ parsed
+
     expected <- read_expected_program src_ir
     shouldBe parsed $ Right expected
 
