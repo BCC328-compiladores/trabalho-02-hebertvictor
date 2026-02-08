@@ -32,7 +32,13 @@ data Lexeme =
     T_While |
     T_Forall |
     T_New |
-    T_Delete | -- <- will we need this?
+    
+    T_Delete | -- <- will we need this?　とりあえず、やっているけど。。。
+
+    T_Lambda | 
+    T_Captures |
+    T_LambdaReturn |
+    T_Eval |
 
     -- IO.
     T_IO_Print |
@@ -168,3 +174,7 @@ lexeme_show T_IO_Scan       = "SCAN"
 lexeme_show T_IO_RC         = "RC"
 
 lexeme_show T_EOF = "EOF"
+
+lexeme_show (T_Lambda) = "kw λ"
+lexeme_show (T_Captures) = "lw captures"
+lexeme_show (T_LambdaReturn) = "kw λ-return"

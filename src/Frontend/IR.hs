@@ -101,6 +101,7 @@ data IR_VarAccess =
 -- @TODO more types constructors oh no. to factor with `Token.hs` defs...
 data IR_Type = 
     -- value used for erroing in the semantical analysis...
+    -- won't be used as a return of neither of the parser nor semantical analyzer...
     NoType |
     
     -- Standard Types
@@ -163,7 +164,6 @@ have_generic _                      = False
 -- now, that is the most tedious part...
 data IR_Expression = 
     ExpNothing | -- Empty expression~
-
     ExpVariable     IR_VarAccess |
     
     -- Literals.
@@ -202,7 +202,8 @@ data IR_Expression =
 
     -- Function call.
     ExpFCall Identifier [IR_Expression] |
-
+    ExpFCall_Implicit IR_Expression [IR_Expression] |
+    
     -- Structure instancing.
     ExpStructInstance Identifier [IR_Expression] | -- `X { values... }`
 
@@ -210,8 +211,11 @@ data IR_Expression =
     ExpArrayInstancing [IR_Expression] |
 
     -- Memory allocation.
-    ExpNew IR_Type 
+    ExpNew IR_Type |
 
+    -- Lambda.
+    ExpLambda IR_Type [IR_Var] [Identifier] [IR_LocatedCommand]
+    
     deriving (Eq, Show, Read)
 
 
@@ -405,6 +409,7 @@ instance Pretty IR_LocatedCommand where
 
 instance Pretty IR_Type where
     pretty :: IR_Type -> PrettyContext ()
+    pretty NoType           = pc_tell ""
     pretty TypeVoid         = pc_tell "void"
     pretty TypeBool         = pc_tell "bool"
     pretty TypeInt          = pc_tell "int"

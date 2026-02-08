@@ -36,20 +36,26 @@ import Frontend.Lexer hiding (lexer)
     FLOATING        { Token literal_pos (T_Floating $$) }
     BOOLEAN         { Token literal_pos (T_Bool $$ ) }
     STRING          { Token literal_pos (T_String $$) }
-
+    
     -- Keywords.
-    FUNC            { Token _ (T_Func) }
-    STRUCT          { Token _ (T_Struct) }
-    LET             { Token _ (T_Let) }
-    RETURN          { Token $$ (T_Return) }
-    IF              { Token $$ T_If }
-    ELIF            { Token $$ (T_Elif) }
-    ELSE            { Token _ (T_Else) }
-    FOR             { Token $$ (T_For) }
-    WHILE           { Token $$ (T_While) }
-    FORALL          { Token _ (T_Forall) }
-    NEW             { Token _ (T_New) }
-    DELETE          { Token _ (T_Delete) }
+    FUNC            { Token _   (T_Func) }
+    STRUCT          { Token _   (T_Struct) }
+    LET             { Token _   (T_Let) }
+    RETURN          { Token $$  (T_Return) }
+    IF              { Token $$  T_If }
+    ELIF            { Token $$  (T_Elif) }
+    ELSE            { Token _   (T_Else) }
+    FOR             { Token $$  (T_For) }
+    WHILE           { Token $$  (T_While) }
+    FORALL          { Token _   (T_Forall) }
+    NEW             { Token _   (T_New) }
+    DELETE          { Token _   (T_Delete) }
+    
+    LAMBDA          { Token $$  (T_Lambda) }
+    CAPTURES        { Token $$  (T_Captures) }
+    L_RETURN        { Token $$  (T_LambdaReturn) }
+    EVAL            { Token $$  (T_Eval) }
+
     TYPE_VOID       { Token _ T_TypeVoid }
     TYPE_BOOL       { Token _ T_TypeBool }
     TYPE_INT        { Token _ T_TypeInt }
@@ -262,6 +268,9 @@ OptionalExpression :
 
 Expression :: { IR_Expression }
 Expression :
+    -- implicit function call.
+    EVAL Expression '<-' '(' ArgList ')'    { ExpFCall_Implicit $2 $5 } |
+
     -- literals.
     INTEGRAL                        { ExpLitInteger $1 } |
     FLOATING                        { ExpLitFloating $1 } |
@@ -276,7 +285,7 @@ Expression :
     Expression '//' Expression      { ExpIntDiv $1 $3 } |
     Expression '**' Expression      { ExpPow $1 $3 } |
     Expression '%' Expression       { ExpMod $1 $3 } |
-    
+
     -- relational operators.
     Expression '==' Expression      { ExpEq $1 $3 } |
     Expression '!=' Expression      { ExpNeq $1 $3 } |
@@ -296,9 +305,12 @@ Expression :
     '--' Expression                 { ExpLDecr $2 } |
     Expression '++'                 { ExpRIncr $1 } |
     Expression '--'                 { ExpRDecr $1 } |
-
-    -- function call.
+    
+    -- explicit function call.
     IDENTIFIER '(' ArgList ')'      { ExpFCall $1 $3 } |
+    
+    -- lambda.
+    LAMBDA ParameterList2 OptionalLambdaCapture OptionalLambdaReturn '{' CommandList '}'     { ExpLambda $4 $2 $3 $6 } |
 
     -- structures.
     IDENTIFIER '{' ArgList '}'      { ExpStructInstance $1 $3 } |
@@ -327,6 +339,24 @@ ArgList2 :
     ArgList2 ',' Expression         { $1 ++ [$3] }
 
 
+OptionalLambdaCapture :: { [Identifier] }
+OptionalLambdaCapture : 
+                        { [] } |
+    CAPTURES ASDList    { $2 } -- for instance...
+
+
+ASDList :: { [Identifier] }
+ASDList :
+    IDENTIFIER { [$1] } |
+    ASDList ',' IDENTIFIER { $1 ++ [$3] }
+
+
+OptionalLambdaReturn :: { IR_Type }
+OptionalLambdaReturn :
+    -- {- undefined type... -}     { TypeVoid } |
+    L_RETURN Type               { $2 }
+
+
 
 ----------------------------
 -- Variables and Literals --
@@ -350,7 +380,7 @@ TypeSpec :
 OptionalTypeSpec :: { IR_Type } -- `T_S^*`.
 OptionalTypeSpec :
     TypeSpec    { $1 } |
-                {  TypeVoid }
+                { TypeVoid }
 
 
 VariableAccess :: { IR_VarAccess }

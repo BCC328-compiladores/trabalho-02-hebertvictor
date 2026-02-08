@@ -58,6 +58,12 @@ tokens :-
     <0> "forall"            { tokenize_simple T_Forall }
     <0> "new"               { tokenize_simple T_New }
     <0> "delete"            { tokenize_simple T_Delete }
+    
+    <0> "lambda"            { tokenize_simple T_Lambda }
+    <0> "captures"          { tokenize_simple T_Captures }
+    <0> "returns"           { tokenize_simple T_LambdaReturn }
+    <0> "eval"              { tokenize_simple T_Eval }
+        
     <0> "void"              { tokenize_simple T_TypeVoid }    
     <0> "bool"              { tokenize_simple T_TypeBool }    
     <0> "int"               { tokenize_simple T_TypeInt }    

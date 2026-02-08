@@ -126,6 +126,11 @@ io_specs = describe "IO data" $ do
         expected <- read_expected_tokens "tests/data/expected/ex5.tokens"
         shouldBe tokens $ Right expected 
 
+    it "ex6.sl" $ do
+        tokens <- tokenizef "data/sl/ex6.sl"
+        expected <- read_expected_tokens "tests/data/expected/ex6.tokens"
+        shouldBe tokens $ Right expected 
+
 
 expr_specs :: Spec -- just for ...
 expr_specs = describe "Expressions" $ do

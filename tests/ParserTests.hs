@@ -62,19 +62,19 @@ error_specs = describe "Parsing errors" $ do
 
 structure_specs :: Spec
 structure_specs = describe "Parsing struct def" $ do
-    it "empty" $ do
+    it "empty #1" $ do
         let parsed = parse_sl "struct doidera { }"
         parsed `shouldBe` (Right $ Program [StructDef { symbol_name = "doidera", fields = [], symbol_pos = SrcPos (1, 8) }])
     
-    it "empty2" $ do
+    it "empty #2" $ do
         let parsed = parse_sl "struct doidera {\n\n}"
         parsed `shouldBe` (Right $ Program [StructDef { symbol_name = "doidera", fields = [], symbol_pos = SrcPos (1, 8) }])
 
-    it "one field" $ do
+    it "one field #1" $ do
         let parsed = parse_sl "struct doidera { x: int; }"
         parsed `shouldBe` (Right $ Program [StructDef { symbol_name = "doidera", fields = [VarDecl "x" TypeInt], symbol_pos = SrcPos (1, 8) }])
     
-    it "one field2 error" $ do
+    it "one field #2 error" $ do
         -- same thing, but this one should return an error (expression without semicolon).
         let parsed = parse_sl "struct doidera { x: int }"
         parsed `shouldBe` (pe "Lexeme: enc. \"}\"." (1, 25))
@@ -91,10 +91,9 @@ structure_specs = describe "Parsing struct def" $ do
             symbol_pos = SrcPos (1, 8)}]
             )
 
-
 simple_specs :: Spec
 simple_specs = describe "Parsing simple functions" $ do
-    it "empty" $ do
+    it "empty #1" $ do
         let parsed = parse_sl "func camarada() : void {}"
         parsed `shouldBe` (Right $ Program [FuncDef {
             symbol_name         = "camarada",
@@ -105,7 +104,7 @@ simple_specs = describe "Parsing simple functions" $ do
             symbol_pos          = SrcPos (1, 6)
         }])
     
-    it "empty2" $ do
+    it "empty #2" $ do
         let parsed = parse_sl "func camarada(void) : void {}"
         parsed `shouldBe` (Right $ Program [FuncDef {
             symbol_name         = "camarada",
@@ -116,7 +115,7 @@ simple_specs = describe "Parsing simple functions" $ do
             symbol_pos          = SrcPos (1, 6)
         }])
 
-    it "empty with let1" $ do
+    it "empty with let #1" $ do
         let parsed = parse_sl "func camarada() : void { let x : int = 1; }"
         parsed `shouldBe` (Right $ Program [FuncDef {
             symbol_name         = "camarada",
@@ -129,7 +128,7 @@ simple_specs = describe "Parsing simple functions" $ do
             symbol_pos          = SrcPos (1, 6)
         }])
 
-    it "empty with let2" $ do
+    it "empty with let #2" $ do
         let parsed = parse_sl "func camarada() : void { let x = 1; }"
         parsed `shouldBe` (Right $ Program [FuncDef {
             symbol_name         = "camarada",
@@ -294,8 +293,6 @@ read_expected_program filepath = do
 parse_and_compare_program :: FilePath -> FilePath -> IO ()
 parse_and_compare_program src src_ir = do
     parsed <- fparse src
-    print $ parsed
-
     expected <- read_expected_program src_ir
     shouldBe parsed $ Right expected
 
@@ -325,3 +322,4 @@ program_specs = describe "Parsing programs" $ do
     it "ex3.sl" $ parse_and_compare_program "data/sl/ex3.sl" "tests/data/expected/ex3.ir"
     it "ex4.sl" $ parse_and_compare_program "data/sl/ex4.sl" "tests/data/expected/ex4.ir"
     it "ex5.sl" $ parse_and_compare_program "data/sl/ex5.sl" "tests/data/expected/ex5.ir"
+    it "ex6.sl" $ parse_and_compare_program "data/sl/ex6.sl" "tests/data/expected/ex6.ir"

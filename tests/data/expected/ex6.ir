@@ -1,0 +1,130 @@
+Program
+[
+    FuncDef
+    {
+        symbol_name = "main",
+        function_rtype = TypeVoid,
+        function_parameters = [],
+        function_gtypes = [],
+        function_body =
+        [
+            LC
+            {
+                lc_cmd =
+                    VarDef
+                    (VarDecl "x1" TypeInt)
+                    (ExpLitInteger 7),
+                lc_pos = SrcPos (10,20)
+            },
+            LC
+            {
+                lc_cmd =
+                    VarDef
+                    (VarDecl "x2" TypeInt)
+                    (ExpLitInteger 27),
+                lc_pos = SrcPos (11,21)
+            },
+            LC
+            {
+                lc_cmd =
+                    VarDef
+                    (VarDecl "x3" TypeInt)
+                    (ExpLitInteger 92),
+                lc_pos = SrcPos (12,21)
+            },
+            LC
+            {
+                lc_cmd =
+                    VarDef
+                    (VarDecl "f" TypeVoid)
+                    (ExpLambda
+                        TypeInt
+                        [
+                            VarDecl "x" TypeInt,
+                            VarDecl "y" TypeVoid,
+                            VarDecl "z" TypeVoid
+                        ]
+                        ["x1","x2","x3"]
+                        [
+                            LC
+                            {
+                                lc_cmd =
+                                    Return
+                                    (ExpSum
+                                        (ExpSum
+                                            (ExpSum
+                                                (ExpSum
+                                                    (ExpSum
+                                                        (ExpVariable (VarAccess "x1" VarAccessNothing))
+                                                        (ExpVariable (VarAccess "x2" VarAccessNothing))
+                                                    )
+                                                    (ExpVariable (VarAccess "x3" VarAccessNothing))
+                                                )
+                                                (ExpVariable (VarAccess "x" VarAccessNothing))
+                                            )
+                                            (ExpVariable (VarAccess "y" VarAccessNothing))
+                                        )
+                                        (ExpVariable (VarAccess "z" VarAccessNothing))
+                                    ),
+                                lc_pos = SrcPos (15,9)
+                            }
+                        ]
+                    ),
+                lc_pos = SrcPos (16,6)
+            },
+            LC
+            {
+                lc_cmd =
+                    CmdExpression
+                    (ExpFCall
+                        "print"
+                        [
+                            ExpFCall_Implicit
+                            (ExpLambda
+                                TypeInt
+                                [VarDecl "x" TypeInt]
+                                []
+                                [
+                                    LC
+                                    {
+                                        lc_cmd =
+                                            Return
+                                            (ExpSum
+                                                (ExpVariable (VarAccess "x" VarAccessNothing))
+                                                (ExpLitInteger 1)
+                                            ),
+                                        lc_pos = SrcPos (19,44)
+                                    }
+                                ]
+                            )
+                            [
+                                ExpLitInteger 1,
+                                ExpLitInteger 2,
+                                ExpLitInteger 3
+                            ]
+                        ]
+                    ),
+                lc_pos = SrcPos (20,6)
+            },
+            LC
+            {
+                lc_cmd =
+                    CmdExpression
+                    (ExpFCall
+                        "print"
+                        [
+                            ExpFCall
+                            "f"
+                            [
+                                ExpLitInteger 78,
+                                ExpLitInteger 85,
+                                ExpLitInteger 37
+                            ]
+                        ]
+                    ),
+                lc_pos = SrcPos (24,6)
+            }
+        ],
+        symbol_pos = SrcPos (8,6)
+    }
+]

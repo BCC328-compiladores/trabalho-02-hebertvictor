@@ -877,11 +877,11 @@ __verify_parameter sname param_type (exp_type, n) = do
 -- Tell if two tipes are semantically compatible.
 -- That is, if they're non-strictly equal or one of them is of TypeVoid.
 type_match :: IR_Type -> IR_Type -> Bool
-type_match t1 t2 = t1 `type_eq` t2 || t1 == TypeVoid || t2 == TypeVoid
+type_match t1 t2 = t1 `type_eq` t2 || t1 == TypeVoid || t2 == TypeVoid || t1 == NoType || t2 == NoType
 -- @TODO TypeVoid represents that the type couldn't be evaluated, for now!
 
 function_rtype_match :: IR_Type -> IR_Type -> Bool
-function_rtype_match rtype t = rtype `type_eq` t || t == TypeVoid
+function_rtype_match rtype t = rtype `type_eq` t || t == TypeVoid || t == NoType
 
 
 -- fala se o tipo não está resolvido (se ele for genérico).
