@@ -11,6 +11,7 @@ import ParserTests (fparse)
 import Frontend.Error
 import Frontend.IR
 import Frontend.Semantics   
+import Frontend.Pretty
 
 import Data.Either (fromLeft)
 
@@ -50,7 +51,7 @@ tests = describe "Semantical tests" $ do
 
 symbol_error_specs :: Spec
 symbol_error_specs = describe "Statement violations" $ do
-    it "Invalid structs" $ do
+    it "Invalid structs (ep1.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep1.sl" $ sem [
             ("Structure \"A\" have no fields!",                                             (7, 8)),
             ("Field \"x\" declared as void on struct \"camarada\"",                         (11, 8)),
@@ -61,7 +62,7 @@ symbol_error_specs = describe "Statement violations" $ do
             ("Field \"z\" declared as a function on struct \"asd\"",                        (22, 8))
             ]
 
-    it "Multiple symbol definition" $ do
+    it "Multiple symbol definition (ep2.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep2.sl" $ sem [
             ("Symbol \"A\" defined multiple (3) times",                                     (19, 8)),
             ("Symbol \"asd\" defined multiple (2) times",                                   (11, 6))
@@ -70,20 +71,20 @@ symbol_error_specs = describe "Statement violations" $ do
 
 type_error_specs :: Spec
 type_error_specs = describe "Type violations" $ do
-    it "No-explicit return" $ do
+    it "No-explicit return (ep3.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep3.sl" $ sem [
             ("Function \"doidera\" have no explicit return but expects float",              (7, 6)),
             ("Function \"main\" have no explicit return but expects int",                   (13, 6))
             ]
     
-    it "Unexpected return type" $ do
+    it "Unexpected return type (ep4.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep4.sl" $ sem [
             ("Function \"coisa_doida\" expects type void; yet, int is returned",            (8, 5)),
             ("Function \"negocio_maluco\" expects type int; yet, string is returned",       (12, 5)),
             ("Function \"objeto_delirado\" expects type void; yet, int is returned",        (16, 5))
             ]
 
-    it "Invalid attribution" $ do
+    it "Invalid attribution (ep6.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep6.sl" $ sem [
             ("Variable \"y\" (float) is set to an expression that evaluates to int",        (30, 22)),
             ("Assigning expression of type string to \"x\" (int)",                          (32, 39)),
@@ -95,36 +96,39 @@ type_error_specs = describe "Type violations" $ do
             ("Indexing non-array (int) at [0] on variable \"h\"",                           (46, 23))
             ]
 
-    it "Arrays, structs and functions" $ do
+    it "Arrays, structs and functions (ep8.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep8.sl" $ sem [
-            ("Null-array instancing. What about a no?",                                     (46, 25)),
-            ("Non-homogeneous array instancing: [int, float, string]",                      (47, 41)),
-            ("Variable \"z3\" (int[])c is set to an expression that evaluates to float[3]", (48, 38)),
-            ("Invalid array instancing: new int[]",                                         (50, 32)),
-            ("Allocating non-array type int is meaningless",                                (51, 30)),
-            ("Variable \"w\" (int[4]) is not being used",                                   (41, 34)),
-            ("Calling struct \"Aluno\" (defined at (7, 8)) as a function!",                 (60, 22)),
-            ("Variable \"a\" (Aluno) is not being used",                                    (57, 31)),
-            ("Function \"function_not_defined\" is undefined",                              (67, 34)),
-            ("Calling function \"SOMA\" with wrong number of arguments (3 out of 2)",       (70, 49)),
-            ("Variable \"x\" (int) is redefined with type int",                             (73, 33)),
+            ("Null-array instancing. What about a no?",                                             (46, 25)),
+            ("Non-homogeneous array instancing: [int, float, string]",                              (47, 41)),
+            ("Variable \"z3\" (int[]) is set to an expression that evaluates to float[3]",          (48, 38)),
+            ("Invalid array instancing: new int[]",                                                 (50, 32)),
+            ("Allocating non-array type int is meaningless",                                        (51, 30)),
+            ("Variable \"w\" (int[4]) is not being used",                                           (41, 34)),
+            ("Calling struct \"Aluno\" (defined at (7, 8)) as a function!",                         (60, 22)),
+            ("Variable \"a\" (Aluno) is not being used",                                            (57, 31)),
+            ("Function \"function_not_defined\" is undefined",                                      (67, 34)),
+            ("Calling function \"SOMA\" with wrong number of arguments (3 out of 2)",               (70, 49)),
+            ("Variable \"x\" (int), first defined at (70, 49), is redefined with type int",         (73, 33)),
             ("Invalid argument #1 on function \"SOMA\" call: expected int, yet, argument is float", (73, 33)),
             ("Invalid argument #2 on function \"SOMA\" call: expected int, yet, argument is float", (73, 33)),
-            ("Variable \"x\" (int) is not being used",                                      (70, 49))
+            ("Variable \"x\" (int) is not being used",                                              (70, 49))
             ]
 
 scope_error_specs :: Spec
 scope_error_specs = describe "Scope violations" $ do
-    it "Variable re-definition" $ do
+    it "Variable re-definition (ep5.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep5.sl" $ sem [
-            ("Variable \"x\" (int) is redefined with type int",                             (7, 6)),
-            ("Variable \"x\" (int) is redefined with type void",                            (8, 14)),
-            ("Variable \"x\" (int) is redefined with type int",                             (9, 20)),
-            ("Variable \"x\" (int) is redefined with type float",                           (10, 24)),
+            ("Variable \"x\" (int), first defined at (7, 6), is redefined with type int",   (7, 6)),
+            ("Variable \"x\" (int), first defined at (7, 6), is redefined with type void",  (8, 14)),
+            ("Variable \"x\" (int), first defined at (7, 6), is redefined with type int",   (9, 20)),
+            ("Variable \"x\" (int), first defined at (7, 6), is redefined with type float", (10, 24)),
             ("Function \"tudo_certo\" expects type int; yet, string is returned",           (13, 5))
             ]
 
-    it "Access violation" $ do
+    it "Access violation (ep7.sl)" $ do
+        -- verified <- verify_src "data/sl/sa/ep7.sl"
+        -- putStrLn $ pretty_sl verified
+
         verify_src_and_compare "data/sl/sa/ep7.sl" $ sem [
             ("Invalid field \"campo\" access of structure B on variable \"h\"",             (43, 19)),
             ("Invalid field \"campo_todo\" access of structure B on variable \"h\"",        (44, 24)),
@@ -143,7 +147,7 @@ scope_error_specs = describe "Scope violations" $ do
 
 
 global_specs :: Spec
-global_specs = describe "General program structurec" $ do
+global_specs = describe "General program structure" $ do
     it "Empty translation unit" $ do
         -- @TODO
         1 `shouldBe` 1

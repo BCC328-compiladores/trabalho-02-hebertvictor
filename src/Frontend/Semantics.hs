@@ -36,6 +36,7 @@ import Control.Monad ( mapM, mapM_, zipWithM_ )
 type SymbolTable = Map Identifier IR_Statement
 
 
+-- just for the convenience of a default function statement...
 null_function :: IR_Statement
 null_function = FuncDef {
     symbol_name = "@undef_function",
@@ -123,7 +124,7 @@ default_fc = FC null_function False
 
 data FunctionContext = FC {
     fc_statement    :: IR_Statement,
-    fc_has_return   :: Bool -- IF THE FUNCTION HAS A RETURN AT THE END!
+    fc_has_return   :: Bool -- TRACKS IF THE FUNCTION HAS A RETURN AT THE END!
 } deriving (Eq, Show)
 
 data SemanticalState = SemanticalState {
@@ -375,15 +376,14 @@ verify_command (LC (Assignment varaccess exp) pos) = do
 
     (varaccess', access_type) <- verify_access varaccess
     (exp', exp_type) <- verify_expression exp
-    exp_type' <- verify_type exp_type
 
-    if type_match exp_type' access_type then do
+    if type_match exp_type access_type then do
         -- then the types either couldn't be decided or they do match correctly.
         return $ ()
 
     else do
         -- then definitevely there is an error on the expressions type.
-        sc_raise $ "Assigning expression of type " ++ pretty_sl exp_type' ++ " to " ++ show (pretty_sl varaccess) ++ " (" ++ pretty_sl access_type ++ ")"
+        sc_raise $ "Assigning expression of type " ++ pretty_sl exp_type ++ " to " ++ show (pretty_sl varaccess) ++ " (" ++ pretty_sl access_type ++ ")"
 
     return $ LC (Assignment varaccess' exp') pos
 
@@ -471,15 +471,15 @@ load_variable (VarDecl vname vtype) = do
     
     vm <- sc_get_vm
     pos <- sc_get_pos
-
+    
     -- checking for shadowing...
     case Map.lookup vname vm of 
         Nothing -> do
             -- OK
             sc_set_vm (Map.insert vname (VariableInfo vname vtype 0 pos) vm)
         
-        Just (VariableInfo _ t _ _) -> do
-            sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl t ++ "), defined at " ++ pretty_sl pos ++ ", is redefined with type " ++ pretty_sl vtype
+        Just (VariableInfo _ t _ def_pos) -> do
+            sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl t ++ "), first defined at " ++ pretty_sl def_pos ++ ", is redefined with type " ++ pretty_sl vtype
 
 
 -- Structurally similar to `ic_pm_read`.
@@ -707,9 +707,14 @@ verify_type t = return $ t
 verify_expression :: IR_Expression -> SemanticalContext (IR_Expression, IR_Type)
 verify_expression exp = do
     let reduced_exp = reduce_expression exp
+    -- sc_raise $ ">>> VERIFY_EXPRESSION TYPE CHECK " ++ pretty_sl reduced_exp
+    
     vtype <- type_check_expression reduced_exp
+
+    --sc_raise $ ">>> VERIFY_EXPRESSION VERIFY TYPE " ++ pretty_sl exp
     vtype' <- verify_type vtype
     return $ (reduced_exp, vtype')
+    --return $ (reduced_exp, vtype)
 
 
 type_check_expression :: IR_Expression -> SemanticalContext IR_Type
@@ -745,19 +750,25 @@ type_check_expression (ExpLDecr e)              = type_check_expression e -- @TO
 type_check_expression (ExpRDecr e)              = type_check_expression e -- @TODO
 
 type_check_expression (ExpVariable va)          = do
+    --sc_raise $ ">>> TYPE_CHECK_EXPRESSION: " ++ pretty_sl va
     (_, vtype) <- verify_access va
     return $ vtype
 
 type_check_expression (ExpFCall sname exps)     = do
+    --sc_raise $ ">>> >>> TYPECHECK FCALL: " ++ pretty_sl (ExpFCall sname exps) 
+
     verified <- mapM verify_expression exps
     let exps' = fst <$> verified
+    let types' = snd <$> verified
+
+    --sc_raise $ ">>> >>> TYPECHECK FCALL. VERIFIED: " ++ pretty_sl verified
 
     st <- sc_get_st
     case Map.lookup sname st of
         Just (FuncDef _ rtype param gtypes body pos) -> do
             -- found the corresponding function.
             let param_types = (\(VarDecl _ t) -> t) <$> param
-            __type_check_function_call sname exps' param_types rtype
+            __type_check_function_call sname types' param_types rtype
 
         Just (StructDef _ _ pos) -> do
             sc_raise $ "Calling struct " ++ show sname ++ " (defined at " ++ pretty_sl pos ++ ") as a function!"
@@ -771,7 +782,7 @@ type_check_expression (ExpFCall sname exps)     = do
                 Just (VariableInfo _ (TypeFunction param_types rtype) _ _) -> do
                     -- creating dummy access...
                     verify_access (VarAccess sname VarAccessNothing)
-                    __type_check_function_call sname exps' param_types rtype
+                    __type_check_function_call sname types' param_types rtype
 
                 _   -> do
                     -- then the function really doesn't exists whatsoever.
@@ -838,15 +849,15 @@ type_check_expression _                     = do
     return $ TypeVoid
 
 
-__type_check_function_call :: Identifier -> [IR_Expression] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
-__type_check_function_call sname exps param_types rtype = do
-    
-    if  length param_types /= length exps then do
-        sc_raise $ "Calling function " ++ show sname ++ " with wrong number of arguments (" ++ show (length exps) ++ " out of " ++ show (length param_types) ++ ")"
-    else return $ ()
+__type_check_function_call :: Identifier -> [IR_Type] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
+__type_check_function_call sname types param_types rtype = do
 
+    if  length param_types /= length types then do
+        sc_raise $ "Calling function " ++ show sname ++ " with wrong number of arguments (" ++ show (length types) ++ " out of " ++ show (length param_types) ++ ")"
+    else return $ ()
+    
     -- independently of the # of args...
-    types <- mapM type_check_expression exps 
+    --types <- mapM type_check_expression exps 
     zipWithM_ (__verify_parameter sname) param_types (zip types [1..])
 
     return $ rtype

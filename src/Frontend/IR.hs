@@ -100,6 +100,9 @@ data IR_VarAccess =
 
 -- @TODO more types constructors oh no. to factor with `Token.hs` defs...
 data IR_Type = 
+    -- value used for erroing in the semantical analysis...
+    NoType |
+    
     -- Standard Types
     TypeVoid    |
     TypeBool    |

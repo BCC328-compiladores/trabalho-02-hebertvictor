@@ -126,6 +126,7 @@ test-suite data-tests
         time >=1.12,
         array >= 0,
         hspec >= 2.7,
+        hspec-expectations,
         HarmonicalVortex
 
     build-tool-depends:

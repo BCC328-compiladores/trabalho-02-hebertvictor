@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: sl-assignment
+    container_name: sl-assignment2
     volumes:
       # Mount your project directory to /workspace in the container
       - ./:/workspace
