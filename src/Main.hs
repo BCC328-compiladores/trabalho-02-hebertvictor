@@ -68,7 +68,7 @@ main = do
         let tokens = lexer file_content
         case tokens of
             Left error_str ->
-                putStrLn $ "Lexer error: " ++ error_str
+                putStrLn $ "Lexer error: " ++ pretty_sl error_str
 
             Right tk_list -> do
                 putStrLn "Tokens:"
@@ -81,7 +81,7 @@ main = do
     when (opt_parser options) $ do
         case parsed of
             Left error_str ->
-                putStrLn $ "Parser Error: " ++ error_str
+                putStrLn $ "Parser Error: " ++ pretty_sl error_str
 
             Right ir -> do
                 putStrLn "Program IR:"
@@ -92,7 +92,7 @@ main = do
     when (opt_pretty options) $ do
         case parsed of
             Left error_str ->
-                putStrLn $ "Parser Error: " ++ error_str
+                putStrLn $ "Parser Error: " ++ pretty_sl error_str
 
             Right ir_program -> do
                 putStrLn "Program:"

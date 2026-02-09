@@ -43,7 +43,7 @@ asd filepath = do
 
 
 tests :: Spec
-tests = describe "Parser tests" $ do
+tests = describe "Interpreter tests" $ do
     error_specs
     sample_specs
 
