@@ -102,8 +102,8 @@ data IR_VarAccess =
 data IR_Type = 
     -- value used for erroing in the semantical analysis...
     -- won't be used as a return of neither of the parser nor semantical analyzer...
-    NoType |
-    
+    NoType      |
+
     -- Standard Types
     TypeVoid    |
     TypeBool    |
@@ -116,7 +116,7 @@ data IR_Type =
 
     -- Functions.
     TypeFunction [IR_Type] IR_Type | -- parameter type -> RT.
-
+    
     -- Generics
     TypeGeneric Identifier |
 
@@ -159,6 +159,10 @@ have_generic (TypeFunction ts tr)   = or (have_generic <$> ts) || have_generic t
 have_generic _                      = False
 
 
+-- verifies if the type is not of NoType...
+is_type_invalid :: IR_Type -> Bool
+is_type_invalid NoType = True
+is_type_invalid _ = False
 
 
 -- now, that is the most tedious part...
@@ -214,7 +218,8 @@ data IR_Expression =
     ExpNew IR_Type |
 
     -- Lambda.
-    ExpLambda IR_Type [IR_Var] [Identifier] [IR_LocatedCommand]
+    ExpLambda IR_Type [IR_Var] [Identifier] [IR_LocatedCommand] |
+    ExpLiftedLambda Identifier
     
     deriving (Eq, Show, Read)
 

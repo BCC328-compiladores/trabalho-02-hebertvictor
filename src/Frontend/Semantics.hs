@@ -24,6 +24,7 @@ import Data.List ( elemIndex )
 import Data.Either
 import Data.Maybe ( isNothing, fromJust )
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Control.Monad ( mapM, mapM_, zipWithM_ )
 
@@ -40,7 +41,7 @@ type SymbolTable = Map Identifier IR_Statement
 null_function :: IR_Statement
 null_function = FuncDef {
     symbol_name = "@undef_function",
-    function_rtype = TypeInt,
+    function_rtype = TypeVoid,
     function_parameters = [],
     function_gtypes = [],
     function_body = [],
@@ -116,22 +117,27 @@ data VariableInfo = VariableInfo { -- state
     varstat_def_pos     :: SrcPos
 } deriving (Eq, Show)
 
+varstat_to_vardecl :: VariableInfo -> IR_Var
+varstat_to_vardecl (VariableInfo vname vtype _ _) = VarDecl vname vtype
+
 type GenericsMap = Map Identifier IR_Type
 type VariableMap = Map Identifier VariableInfo
 
 
-default_fc = FC null_function False
+default_fc = FC null_function False 0
 
 data FunctionContext = FC {
     fc_statement    :: IR_Statement,
-    fc_has_return   :: Bool -- TRACKS IF THE FUNCTION HAS A RETURN AT THE END!
+    fc_has_return   :: Bool, -- TRACKS IF THE FUNCTION HAS A RETURN AT THE END!
+    fc_lambda_count :: Int
 } deriving (Eq, Show)
+
 
 data SemanticalState = SemanticalState {
     ss_st       :: SymbolTable,
     ss_gm       :: GenericsMap,
     ss_vm       :: VariableMap, -- @TODO actually, this goes to function context?
-    ss_fc       :: FunctionContext,
+    ss_fc       :: FunctionContext, -- @TODO rename into SCOPE?!
     ss_src_pos  :: SrcPos
 } deriving (Eq, Show)
 
@@ -244,36 +250,7 @@ verify_program p@(Program statements) = do
 
 verify_statement :: IR_Statement -> SemanticalContext IR_Statement
 verify_statement f@(FuncDef sname rtype param gtypes body pos) = do
-    -- 1 - well defined scope & symbol resolution;
-    -- 2 - concordance with return expression and function's rtype;
-    -- 3 - what more?
-
-    -- saving older state...
-    gm <- sc_get_gm
-    vm <- sc_get_vm
-
-    -- setting up state.
-    sc_set_pos pos
-    
-    mapM_ (\g -> load_generic g TypeVoid) gtypes -- loading generics.
-    mapM_ load_variable param -- loading the variables into memory.
-    
-    sc_set_fc $ FC f False
-
-    -- verifying each command individually...
-    commands' <- mapM verify_command body
-    
-    -- checking for end-of-function state.
-    verified_rtype <- verify_type rtype
-    verify_function_final_state 
-
-    -- resetting analysis state...
-    sc_set_gm gm
-    sc_set_vm vm
-    sc_set_fc $ FC null_function False
-
-    return $ FuncDef sname verified_rtype param gtypes commands' pos
-
+    verify_function f Map.empty
 
 verify_statement s@(StructDef sname fields pos) = do
     -- 1 - structure can't have no field.
@@ -292,6 +269,44 @@ verify_statement s@(StructDef sname fields pos) = do
     sc_set_st $ Map.insert sname s' st
 
     return $ s'
+
+
+verify_function :: IR_Statement -> VariableMap -> SemanticalContext IR_Statement
+verify_function f@(FuncDef sname rtype param gtypes body pos) context_vm = do   
+    -- 1 - well defined scope & symbol resolution;
+    -- 2 - concordance with return expression and function's rtype;
+    -- 3 - what more?
+    --sc_raise $ ">>> VERIFY FUNCTION " ++ show sname
+
+    -- saving older state...
+    gm <- sc_get_gm
+    vm <- sc_get_vm
+
+    -- setting up state.
+    sc_set_vm context_vm
+    sc_set_pos pos
+    
+    mapM_ (\g -> load_generic g TypeVoid) gtypes -- loading generics.
+    mapM_ load_variable param -- loading the variables into memory.
+    
+    fc <- sc_get_fc
+    sc_set_fc $ FC f False (fc_lambda_count fc)
+
+    -- verifying each command individually...
+    commands' <- mapM verify_command body
+    
+    -- checking for end-of-function state.
+    verified_rtype <- verify_type rtype
+    verify_function_final_state 
+
+    -- resetting analysis state...
+    sc_set_gm gm
+    sc_set_vm vm
+
+    fc <- sc_get_fc
+    sc_set_fc $ FC null_function False (fc_lambda_count fc)
+
+    return $ FuncDef sname verified_rtype param gtypes commands' pos
 
 
 verify_function_final_state :: SemanticalContext ()
@@ -316,18 +331,18 @@ verify_function_final_state = do
             else do
                 sc_raise $ "Function " ++ show sname ++ " have no explicit return but expects " ++ pretty_sl rtype
 
-
-
     vm <- sc_get_vm
 
     -- at the end of the function, every variable should be used.
     Map.foldrWithKey verify_if_variable_is_accessed (return ()) vm
-
     where 
         verify_if_variable_is_accessed _ (VariableInfo vname vtype access_count def_pos) _ = do
             sc_set_pos def_pos
             if access_count <= 0 then do
-                sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype ++") is not being used"
+                fc <- sc_get_fc
+                let sname   = (symbol_name . fc_statement) fc
+
+                sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype ++") is not being used on function " ++ show sname
             else return $ ()
 
     -- @TODO: what more?
@@ -342,12 +357,9 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
 
     sc_set_pos pos
     
-    -- loading the variable.
-    load_variable vdecl
-    
     (exp', exp_type)    <- verify_expression exp
     vtype'              <- verify_type vtype
-    
+
     if type_match vtype' exp_type then
         -- ok, expected type.
         return $ ()
@@ -368,6 +380,13 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
                 load_generic g exp_type
 
             _ -> sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype' ++ ") is set to an expression that evaluates to " ++ pretty_sl exp_type  
+
+    -- non-annotated type...
+    vtype' <- if vtype' == TypeVoid && exp_type /= NoType then return $ exp_type
+    else return $ vtype'
+
+    -- loading the variable.
+    load_variable (VarDecl vname vtype')
 
     return $ LC (VarDef (VarDecl vname vtype') exp') pos
 
@@ -404,7 +423,8 @@ verify_command (LC (Return exp) pos) = do
         sc_raise $ "Function " ++ show (symbol_name $ fc_statement fc) ++ " expects type " ++ pretty_sl verified_rtype ++ "; yet, " ++ pretty_sl possible_type ++ " is returned"
 
     -- has return.
-    sc_set_fc $ FC (fc_statement fc) True
+    fc <- sc_get_fc
+    sc_set_fc $ FC (fc_statement fc) True (fc_lambda_count fc)
 
     -- @TODO check current rtype.
     return $ LC (Return exp') pos
@@ -493,7 +513,7 @@ verify_access access@(VarAccess vname next_access) = do
     case Map.lookup vname vm of
         Nothing -> do
             sc_raise $ "Variable " ++ show vname ++ " is not defined"
-            return $ (access, TypeVoid)
+            return $ (access, NoType)
 
         Just (VariableInfo _ vtype access_count def_pos)  -> do
             -- is defined!
@@ -521,7 +541,7 @@ __access_type root_vname access@(VarAccessIndex index_exp next_access) acc = do
 
         _ -> do
             sc_raise $ "Indexing non-array (" ++ pretty_sl verified_acc ++ ") at " ++ pretty_sl access ++ " on variable " ++ show root_vname
-            return $ (access, TypeVoid)
+            return $ (access, NoType)
 
 __access_type root_vname access@(VarAccess vname next_access) acc = do
     verified_acc <- verify_type acc
@@ -544,10 +564,10 @@ __access_type root_vname access@(VarAccess vname next_access) acc = do
                             __access_type root_vname next_access (field_types !! i)
                         _ -> do
                             sc_raise $ "Invalid field " ++ show vname ++ " access of structure " ++ pretty_sl sname ++ " on variable " ++ show root_vname 
-                            return $ (access, TypeVoid)
+                            return $ (access, NoType)
 
                 _ -> error "BEHAVIORIAL ERROR" -- inconsistency
-        
+
         TypeGeneric g       -> do
             -- then it is probably a generic type...
             gm <- sc_get_gm
@@ -555,7 +575,7 @@ __access_type root_vname access@(VarAccess vname next_access) acc = do
                 Just TypeVoid -> do
                     -- A GENERIC NOT YET SOLVED!
                     sc_raise $ "NYI DON'T KNOW WHAT TO DO"
-                    return $ (access, TypeVoid)
+                    return $ (access, NoType)
 
                 Just vtype  -> do
                     -- found the corresponding, valid type!
@@ -564,7 +584,7 @@ __access_type root_vname access@(VarAccess vname next_access) acc = do
                 _ -> do
                     -- then the identifier is neither a structure nor a type.
                     sc_raise $ "NYI Invalid access 55"
-                    return $ (access, TypeVoid)
+                    return $ (access, NoType)
 
         TypeArray base_type exps -> do
             case next_access of -- look ahead...
@@ -576,20 +596,20 @@ __access_type root_vname access@(VarAccess vname next_access) acc = do
 
                     else do
                         sc_raise $ "Invalid " ++ show vname ++ " field access on array on variable " ++ show root_vname
-                        return $ (access, TypeVoid)
+                        return $ (access, NoType)
 
                 _ -> do
                     -- THAT'S PRETTY WRONG!
                     sc_raise $ "Invalid array access on variable " ++ show root_vname
-                    return $ (access, TypeVoid)
+                    return $ (access, NoType)
 
         TypeFunction param_types rtype -> do
             sc_raise $ "Ksks can't access a field of a function; what would that mean?"
-            return $ (access, TypeVoid)
+            return $ (access, NoType)
 
         _ -> do
             sc_raise $ "Invalid access of " ++ show (pretty_sl access) ++ " on type " ++ pretty_sl verified_acc ++ " on variable " ++ show root_vname 
-            return $ (access, TypeVoid)
+            return $ (access, NoType)
         
 
 
@@ -664,7 +684,7 @@ is_valid_index _ = False
 
 
 -- @TODO
--- oh boy. that's where the inference may take place.
+-- oh boy. that's where the inference may take place...
 -- for instance, verifies for just the simple generic to map it.
 -- Converts loose generics TypeGeneric to TypeStruct, when possible.
 verify_type :: IR_Type -> SemanticalContext IR_Type
@@ -689,7 +709,7 @@ verify_type t@(TypeGeneric g) = do
                 _ -> do
                     -- nevermind.
                     sc_raise $ "Unknown type " ++ show (pretty_sl t)
-                    return $ TypeVoid
+                    return $ NoType
 
         Just t -> return $ t
 
@@ -703,15 +723,61 @@ verify_type t = return $ t
 ---------------------------
 
 -- Verifies and type-checks the expression.
--- To verify the expression, it is first reduced and then its typing is verified.
 verify_expression :: IR_Expression -> SemanticalContext (IR_Expression, IR_Type)
+
+verify_expression exp@(ExpFCall sname args) = do
+    --sc_raise $ ">>> VERIFY_EXPRESSION TYPE CHECK FCALL "
+
+    verified <- mapM verify_expression args
+    let args' = fst <$> verified
+    let types' = snd <$> verified
+
+    -- is the function on the symbol table or not?
+    st <- sc_get_st
+    pos <- sc_get_pos
+    case Map.lookup sname st of
+        -- ok, it was a functoin already there...
+        Just (FuncDef _ rtype param _ _ _)  -> do
+            let exp' = ExpFCall sname args'
+            let param_types = (\(VarDecl _ t) -> t) <$> param
+
+            rtype' <- verify_type rtype
+
+            __type_check_function_call sname types' param_types rtype'
+            return $ (exp', rtype')
+
+        Just (StructDef _ _ pos) -> do
+            sc_raise $ "Calling struct " ++ show sname ++ " (defined at " ++ pretty_sl pos ++ ") as a function!"
+            return $ (exp, NoType)
+        
+        _ -> do
+            -- is it a variable?
+            -- then it is probably a local function.
+            vm <- sc_get_vm
+            case Map.lookup sname vm of
+                Just (VariableInfo sname' (TypeFunction param_types rtype) _ _) -> do
+                    -- creating dummy access...
+                    let exp' = ExpFCall sname' args'
+                    rtype' <- verify_type rtype
+
+                    verify_access (VarAccess sname VarAccessNothing)
+                    __type_check_function_call sname types' param_types rtype'
+                    return $ (exp, rtype')
+
+                y   -> do
+                    -- then the function really doesn't exists whatsoever.
+                    sc_raise $ "Function " ++ show sname ++ " is undefined"
+                    -- sc_raise $ show y
+                    return $ (exp, NoType)
+
+-- To verify the expression, it is first reduced and then its typing is verified.
 verify_expression exp = do
     let reduced_exp = reduce_expression exp
-    -- sc_raise $ ">>> VERIFY_EXPRESSION TYPE CHECK " ++ pretty_sl reduced_exp
-    
+    --sc_raise $ ">>> VERIFY_EXPRESSION TYPE CHECK " ++ pretty_sl reduced_exp
+
     vtype <- type_check_expression reduced_exp
 
-    --sc_raise $ ">>> VERIFY_EXPRESSION VERIFY TYPE " ++ pretty_sl exp
+    --sc_raise $ "<<< VERIFY_EXPRESSION VERIFY TYPE " ++ pretty_sl vtype
     vtype' <- verify_type vtype
     return $ (reduced_exp, vtype')
     --return $ (reduced_exp, vtype)
@@ -754,41 +820,6 @@ type_check_expression (ExpVariable va)          = do
     (_, vtype) <- verify_access va
     return $ vtype
 
-type_check_expression (ExpFCall sname exps)     = do
-    --sc_raise $ ">>> >>> TYPECHECK FCALL: " ++ pretty_sl (ExpFCall sname exps) 
-
-    verified <- mapM verify_expression exps
-    let exps' = fst <$> verified
-    let types' = snd <$> verified
-
-    --sc_raise $ ">>> >>> TYPECHECK FCALL. VERIFIED: " ++ pretty_sl verified
-
-    st <- sc_get_st
-    case Map.lookup sname st of
-        Just (FuncDef _ rtype param gtypes body pos) -> do
-            -- found the corresponding function.
-            let param_types = (\(VarDecl _ t) -> t) <$> param
-            __type_check_function_call sname types' param_types rtype
-
-        Just (StructDef _ _ pos) -> do
-            sc_raise $ "Calling struct " ++ show sname ++ " (defined at " ++ pretty_sl pos ++ ") as a function!"
-            return $ TypeVoid
-
-        _ -> do
-            -- function not found.
-            -- is function a local function? a.k.a., variable function?
-            vm <- sc_get_vm
-            case Map.lookup sname vm of
-                Just (VariableInfo _ (TypeFunction param_types rtype) _ _) -> do
-                    -- creating dummy access...
-                    verify_access (VarAccess sname VarAccessNothing)
-                    __type_check_function_call sname types' param_types rtype
-
-                _   -> do
-                    -- then the function really doesn't exists whatsoever.
-                    sc_raise $ "Function " ++ show sname ++ " is undefined"
-                    return $ TypeVoid
-
 type_check_expression (ExpStructInstance sname exps)   = do
     _ <- mapM verify_expression exps
     return $ TypeStruct sname
@@ -800,14 +831,14 @@ type_check_expression instancing@(ExpArrayInstancing exps)     = do
     case exps' of 
         []      -> do
             sc_raise $ "Null-array instancing. What about a no?"
-            return $ TypeVoid
+            return $ NoType
 
         (e:_)   -> do
             types <- mapM type_check_expression exps'
             let t = types !! 0
             if not (and $ (== t) <$> types) then do
                 sc_raise $ "Non-homogeneous array instancing: " ++ pretty_sl types
-                return $ TypeVoid
+                return $ NoType
             else
                 case t of
                     TypeArray b array_exps  -> do
@@ -825,7 +856,7 @@ type_check_expression e@(ExpNew t)              = do
                 []   -> do
                     -- should invariably never happen...
                     sc_raise $ "Invalid array instancing2: " ++ pretty_sl e
-                    return $ TypeVoid
+                    return $ NoType
 
                 _   -> do
                     types <- mapM type_check_expression exps
@@ -836,17 +867,45 @@ type_check_expression e@(ExpNew t)              = do
                     else do
                         -- @TODO more detailed msg?
                         sc_raise $ "Invalid array instancing: " ++ pretty_sl e
-                        return $ TypeVoid
+                        return $ NoType
         
         _ -> do
             sc_raise $ "Allocating non-array type " ++ pretty_sl t  ++ " is meaningless"
-            return $ TypeVoid
+            return $ NoType
 
+type_check_expression (ExpFCall_Implicit exp args) = do
+    sc_raise $ "TYPECHECK IMPLICIT FCALL NYI"
+    -- __type_check_function_call sname types' param_types rtype
+    return $ NoType
+
+type_check_expression lambda@(ExpLambda rtype vars _ _) = do
+    -- lifting lambda...
+    -- at that step, function verification is performed...
+    new_sname <- lift_lambda lambda
+
+    -- then, the type is that of TypeFunction.
+    rtype' <- verify_type rtype
+
+    if is_type_invalid rtype' then do
+        sc_raise $ "Invalid return type for lambda function."
+        return $ NoType
+    
+    else do
+
+        -- taking the types of the parameters...
+        var_types <- mapM verify_type ((\(VarDecl _ t) -> t) <$> vars)
+        
+        if any is_type_invalid var_types then do
+            sc_raise $ "Invalid parameter type on lambda function..."
+            return $ NoType
+
+        else do
+            return $ TypeFunction var_types rtype'
 
 -- Not yet implemented, if any.
 type_check_expression _                     = do
     sc_raise $ "NOT YET IMPLEMENTED"
-    return $ TypeVoid
+    return $ NoType
 
 
 __type_check_function_call :: Identifier -> [IR_Type] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
@@ -909,6 +968,36 @@ type_check_closed_bop_exp bop_str e1 e2 = do
         sc_raise $ "Invalid expression result of " ++ pretty_sl t1 ++ " " ++ bop_str ++ " " ++ pretty_sl t2
         return $ TypeVoid
 
+
+lift_lambda :: IR_Expression -> SemanticalContext Identifier
+lift_lambda lambda@(ExpLambda rtype vars captures cmds) = do
+    fc <- sc_get_fc
+
+    let lambda_id = fc_lambda_count fc
+    let sname = "@LAMBDA-" ++ show lambda_id
+
+    -- vira mais um.
+    sc_set_fc $ FC (fc_statement fc) (fc_has_return fc) (lambda_id + 1)
+
+    st <- sc_get_st
+    pos <- sc_get_pos
+    vm <- sc_get_vm
+
+    let captured = Map.restrictKeys vm $ Set.fromList captures
+    let extended_vars = vars ++ [varstat_to_vardecl v | c <- captures, Just v <- [Map.lookup c captured]]
+
+    statement <- verify_function (FuncDef {
+        symbol_name = sname,
+        function_rtype = rtype,
+        function_parameters = extended_vars,
+        function_gtypes = [],
+        function_body = cmds,
+        symbol_pos = pos
+    }) captured
+
+    sc_set_st $ st_insert statement st
+
+    return $ sname
 
 
 --------------------------
@@ -983,6 +1072,10 @@ reduce_expression (ExpFCall sname exps)                             = ExpFCall s
 reduce_expression (ExpStructInstance sname exps)                    = ExpStructInstance sname   $ reduce_expression <$> exps
 reduce_expression (ExpArrayInstancing exps)                         = ExpArrayInstancing        $ reduce_expression <$> exps
 
+reduce_expression (ExpFCall_Implicit exp args)                      = ExpFCall_Implicit (reduce_expression exp) $ reduce_expression <$> args
+
+-- @TODO reduce expression of lambda expression require an equivalent, mutually recursive, reduce_command...
+
 -- everything else won't be reduced.
 reduce_expression exp = exp
 
@@ -998,6 +1091,7 @@ reduce_bop constructor e1 e2 =
         result = constructor r1 r2
     in  if ((is_literal r1 || c1) && (is_literal r2 || c2)) then reduce_expression result
         else result 
+
 
 
 is_literal :: IR_Expression -> Bool

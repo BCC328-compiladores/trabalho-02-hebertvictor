@@ -46,6 +46,7 @@ tests = describe "Semantical tests" $ do
     symbol_error_specs
     type_error_specs
     scope_error_specs
+    lambda_error_specs
     global_specs
 
 
@@ -103,15 +104,15 @@ type_error_specs = describe "Type violations" $ do
             ("Variable \"z3\" (int[]) is set to an expression that evaluates to float[3]",          (48, 38)),
             ("Invalid array instancing: new int[]",                                                 (50, 32)),
             ("Allocating non-array type int is meaningless",                                        (51, 30)),
-            ("Variable \"w\" (int[4]) is not being used",                                           (41, 34)),
+            ("Variable \"w\" (int[4]) is not being used on function \"arrays\"",                    (41, 34)),
             ("Calling struct \"Aluno\" (defined at (7, 8)) as a function!",                         (60, 22)),
-            ("Variable \"a\" (Aluno) is not being used",                                            (57, 31)),
+            ("Variable \"a\" (Aluno) is not being used on function \"structs\"",                    (57, 31)),
             ("Function \"function_not_defined\" is undefined",                                      (67, 34)),
             ("Calling function \"SOMA\" with wrong number of arguments (3 out of 2)",               (70, 49)),
-            ("Variable \"x\" (int), first defined at (70, 49), is redefined with type int",         (73, 33)),
             ("Invalid argument #1 on function \"SOMA\" call: expected int, yet, argument is float", (73, 33)),
             ("Invalid argument #2 on function \"SOMA\" call: expected int, yet, argument is float", (73, 33)),
-            ("Variable \"x\" (int) is not being used",                                              (70, 49))
+            ("Variable \"x\" (int), first defined at (70, 49), is redefined with type int",         (73, 33)),
+            ("Variable \"x\" (int) is not being used on function \"functions\"",                    (70, 49))
             ]
 
 scope_error_specs :: Spec
@@ -119,7 +120,7 @@ scope_error_specs = describe "Scope violations" $ do
     it "Variable re-definition (ep5.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep5.sl" $ sem [
             ("Variable \"x\" (int), first defined at (7, 6), is redefined with type int",   (7, 6)),
-            ("Variable \"x\" (int), first defined at (7, 6), is redefined with type void",  (8, 14)),
+            ("Variable \"x\" (int), first defined at (7, 6), is redefined with type int",  (8, 14)),
             ("Variable \"x\" (int), first defined at (7, 6), is redefined with type int",   (9, 20)),
             ("Variable \"x\" (int), first defined at (7, 6), is redefined with type float", (10, 24)),
             ("Function \"tudo_certo\" expects type int; yet, string is returned",           (13, 5))
@@ -143,6 +144,16 @@ scope_error_specs = describe "Scope violations" $ do
             ("Invalid \"camarada\" field access on array on variable \"h\"",                (56, 36)),
             ("Invalid array access on variable \"h\"",                                      (57, 36)),
             ("Invalid access of \"coisa_doida\" on type int on variable \"h\"",             (58, 36))
+            ]
+
+
+lambda_error_specs :: Spec
+lambda_error_specs = describe "Lambda" $ do
+    
+    it "#1 (ep9.sl)" $ do
+        verify_src_and_compare "data/sl/sa/ep9.sl" $ sem [
+            ("Invalid field \"campo\" access of structure B on variable \"h\"",             (43, 19)),
+            ("Invalid field \"campo\" access of structure B on variable \"h\"",             (43, 19))
             ]
 
 
