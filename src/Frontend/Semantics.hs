@@ -636,9 +636,6 @@ verify_field sname v@(VarDecl vname vtype) = do
 
         array@(TypeArray t exps)    -> do
             
-            --types <- mapM type_check_expression exps
-            --let non_int_indices = filter (\(t, i) -> t /= TypeInt) $ zip types [1..]
-
             let constants = (constant_eval . reduce_expression) <$> exps
             let invalid_indices = filter __is_invalid $ zip constants [1..] where 
                 __is_invalid (Nothing, _) = True
@@ -743,7 +740,7 @@ verify_expression exp@(ExpFCall sname args) = do
 
             rtype' <- verify_type rtype
 
-            __type_check_function_call sname types' param_types rtype'
+            verify_fcall sname types' param_types rtype'
             return $ (exp', rtype')
 
         Just (StructDef _ _ pos) -> do
@@ -761,7 +758,7 @@ verify_expression exp@(ExpFCall sname args) = do
                     rtype' <- verify_type rtype
 
                     verify_access (VarAccess sname VarAccessNothing)
-                    __type_check_function_call sname types' param_types rtype'
+                    verify_fcall sname types' param_types rtype'
                     return $ (exp, rtype')
 
                 y   -> do
@@ -770,6 +767,123 @@ verify_expression exp@(ExpFCall sname args) = do
                     -- sc_raise $ show y
                     return $ (exp, NoType)
 
+-- literals.
+verify_expression exp@(ExpNothing)          = return $ (ExpNothing, TypeVoid)
+verify_expression exp@(ExpLitInteger _)     = return $ (reduce_expression exp, TypeInt)
+verify_expression exp@(ExpLitFloating _)    = return $ (reduce_expression exp, TypeFloat)
+verify_expression exp@(ExpLitBoolean _)     = return $ (reduce_expression exp, TypeBool)
+verify_expression exp@(ExpLitString _)      = return $ (reduce_expression exp, TypeString)
+
+-- bops.
+verify_expression exp@(ExpSum e1 e2)        = verify_expression_closed_bop "+" e1 e2    ExpSum
+verify_expression exp@(ExpMul e1 e2)        = verify_expression_closed_bop "*" e1 e2    ExpMul
+verify_expression exp@(ExpDiv e1 e2)        = verify_expression_closed_bop "/" e1 e2    ExpDiv
+verify_expression exp@(ExpIntDiv e1 e2)     = verify_expression_closed_bop "//" e1 e2   ExpIntDiv
+verify_expression exp@(ExpMod e1 e2)        = verify_expression_closed_bop "%" e1 e2    ExpMod
+verify_expression exp@(ExpPow e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpPow
+verify_expression exp@(ExpNegative e)       = verify_expression e
+
+verify_expression exp@(ExpEq e1 e2)         = verify_expression_closed_bop "^" e1 e2    ExpEq
+verify_expression exp@(ExpNeq e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpNeq
+verify_expression exp@(ExpGt e1 e2)         = verify_expression_closed_bop "^" e1 e2    ExpGt
+verify_expression exp@(ExpGeq e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpGeq
+verify_expression exp@(ExpLt e1 e2)         = verify_expression_closed_bop "^" e1 e2    ExpLt
+verify_expression exp@(ExpLeq e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpLeq
+
+verify_expression exp@(ExpLIncr e)          = verify_expression e -- @TODO
+verify_expression exp@(ExpRIncr e)          = verify_expression e -- @TODO
+verify_expression exp@(ExpLDecr e)          = verify_expression e -- @TODO
+verify_expression exp@(ExpRDecr e)          = verify_expression e -- @TODO
+
+verify_expression exp@(ExpVariable va)                  = do
+    (_, vtype) <- verify_access va
+    return $ (exp, vtype)
+
+verify_expression exp@(ExpStructInstance sname args)    = do
+    verified_args_and_types <- mapM verify_expression args
+    let verified_args = fst <$> verified_args_and_types
+    return $ (ExpStructInstance sname verified_args, TypeStruct sname)
+
+verify_expression exp@(ExpArrayInstancing args)         = do
+    verified_args_and_types <- mapM verify_expression args
+    let args = fst <$> verified_args_and_types
+    let arg_types = snd <$> verified_args_and_types
+
+    let exp' = ExpArrayInstancing args
+
+    case args of 
+        []      -> do
+            sc_raise $ "Null-array instancing. What about a no?"
+            return $ (exp', NoType)
+
+        (e:_)   -> do
+            let t = arg_types !! 0
+            if not (and $ (== t) <$> arg_types) then do
+                sc_raise $ "Non-homogeneous array instancing: " ++ pretty_sl arg_types
+                return $ (exp', NoType)
+            else
+                case t of
+                    TypeArray b array_exps  -> return $ (exp', TypeArray b ([array_size_expr] ++ array_exps))
+                    _                       -> return $ (exp', TypeArray t [array_size_expr])
+                    where array_size_expr = ExpLitInteger (toInteger $ length args)
+
+verify_expression exp@(ExpNew t)                        = do
+    case t of
+        TypeArray base_type exps ->
+            -- ok
+            case exps of 
+                []   -> do
+                    -- should invariably never happen...
+                    sc_raise $ "Invalid array instancing2: " ++ pretty_sl exp
+                    return $ (exp, NoType)
+
+                _   -> do
+                    verified_exps <- mapM verify_expression exps
+                    let types = snd <$> verified_exps
+
+                    if (and $ (== TypeInt) <$> types)  then do
+                        -- ok
+                        return $ (exp, t)
+
+                    else do
+                        -- @TODO more detailed msg?
+                        sc_raise $ "Invalid array instancing: " ++ pretty_sl exp
+                        return $ (exp, NoType)
+        
+        _ -> do
+            sc_raise $ "Allocating non-array type " ++ pretty_sl t  ++ " is meaningless"
+            return $ (exp, NoType)
+
+verify_expression exp@(ExpFCall_Implicit fcall_exp args) = do
+    sc_raise $ "TYPECHECK IMPLICIT FCALL NYI"
+    -- __type_check_function_call sname types' param_types rtype
+    return $ (exp, NoType)
+
+verify_expression exp@(ExpLambda rtype vars _ _) = do
+    -- lifting lambda...
+    -- at that step, function verification is performed...
+    new_sname <- lift_lambda exp
+
+    -- then, the type is that of TypeFunction.
+    rtype' <- verify_type rtype
+
+    if is_type_invalid rtype' then do
+        sc_raise $ "Invalid return type for lambda function."
+        return $ (exp, NoType)
+    
+    else do
+
+        -- taking the types of the parameters...
+        var_types <- mapM verify_type ((\(VarDecl _ t) -> t) <$> vars)
+        
+        if any is_type_invalid var_types then do
+            sc_raise $ "Invalid parameter type on lambda function..."
+            return $ (exp, NoType)
+
+        else do
+            return $ (exp, TypeFunction var_types rtype')
+
+{-
 -- To verify the expression, it is first reduced and then its typing is verified.
 verify_expression exp = do
     let reduced_exp = reduce_expression exp
@@ -781,142 +895,31 @@ verify_expression exp = do
     vtype' <- verify_type vtype
     return $ (reduced_exp, vtype')
     --return $ (reduced_exp, vtype)
+-}
 
+verify_expression_closed_bop :: String -> IR_Expression -> IR_Expression -> (IR_Expression -> IR_Expression -> IR_Expression) -> SemanticalContext (IR_Expression, IR_Type)
+verify_expression_closed_bop bop_str e1 e2 constructor = do
+    (e1', t1) <- verify_expression e1
+    (e2', t2) <- verify_expression e2
+    let exp = constructor e1' e2'
 
-type_check_expression :: IR_Expression -> SemanticalContext IR_Type
-type_check_expression ExpNothing                = return $ TypeVoid
-
--- literals.
-type_check_expression (ExpLitInteger _)         = return $ TypeInt
-type_check_expression (ExpLitFloating _)        = return $ TypeFloat
-type_check_expression (ExpLitBoolean _)         = return $ TypeBool
-type_check_expression (ExpLitString _)          = return $ TypeString
-
-type_check_expression (ExpSum e1 e2)            = type_check_closed_bop_exp "+" e1 e2
-type_check_expression (ExpMul e1 e2)            = type_check_closed_bop_exp "*" e1 e2
-type_check_expression (ExpDiv e1 e2)            = type_check_closed_bop_exp "/" e1 e2
-type_check_expression (ExpIntDiv e1 e2)         = type_check_closed_bop_exp "//" e1 e2
-type_check_expression (ExpMod e1 e2)            = type_check_closed_bop_exp "%" e1 e2
-type_check_expression (ExpPow e1 e2)            = type_check_closed_bop_exp "^" e1 e2
-type_check_expression (ExpNegative e)           = type_check_expression e
-
-type_check_expression (ExpAnd e1 e2)            = return $ TypeBool
-type_check_expression (ExpOr _ _ )              = return $ TypeBool
-
-type_check_expression (ExpEq _ _ )              = return $ TypeBool
-type_check_expression (ExpNeq _ _)              = return $ TypeBool
-type_check_expression (ExpGt _ _ )              = return $ TypeBool
-type_check_expression (ExpGeq _ _)              = return $ TypeBool
-type_check_expression (ExpLt _ _ )              = return $ TypeBool
-type_check_expression (ExpLeq _ _)              = return $ TypeBool
-
-type_check_expression (ExpLIncr e)              = type_check_expression e -- @TODO
-type_check_expression (ExpRIncr e)              = type_check_expression e -- @TODO
-type_check_expression (ExpLDecr e)              = type_check_expression e -- @TODO
-type_check_expression (ExpRDecr e)              = type_check_expression e -- @TODO
-
-type_check_expression (ExpVariable va)          = do
-    --sc_raise $ ">>> TYPE_CHECK_EXPRESSION: " ++ pretty_sl va
-    (_, vtype) <- verify_access va
-    return $ vtype
-
-type_check_expression (ExpStructInstance sname exps)   = do
-    _ <- mapM verify_expression exps
-    return $ TypeStruct sname
-
-type_check_expression instancing@(ExpArrayInstancing exps)     = do
-    verified <- mapM verify_expression exps
-    let exps' = fst <$> verified
-
-    case exps' of 
-        []      -> do
-            sc_raise $ "Null-array instancing. What about a no?"
-            return $ NoType
-
-        (e:_)   -> do
-            types <- mapM type_check_expression exps'
-            let t = types !! 0
-            if not (and $ (== t) <$> types) then do
-                sc_raise $ "Non-homogeneous array instancing: " ++ pretty_sl types
-                return $ NoType
-            else
-                case t of
-                    TypeArray b array_exps  -> do
-                        return $ TypeArray b ([array_size_expr] ++ array_exps)
-                    _                       -> return $ TypeArray t [array_size_expr]
-
-                    where 
-                        array_size_expr = ExpLitInteger (toInteger $ length exps)
-
-type_check_expression e@(ExpNew t)              = do
-    case t of
-        TypeArray base_type exps ->
-            -- ok
-            case exps of 
-                []   -> do
-                    -- should invariably never happen...
-                    sc_raise $ "Invalid array instancing2: " ++ pretty_sl e
-                    return $ NoType
-
-                _   -> do
-                    types <- mapM type_check_expression exps
-                    if (and $ (== TypeInt) <$> types)  then do
-                        -- ok
-                        return $ t
-
-                    else do
-                        -- @TODO more detailed msg?
-                        sc_raise $ "Invalid array instancing: " ++ pretty_sl e
-                        return $ NoType
-        
-        _ -> do
-            sc_raise $ "Allocating non-array type " ++ pretty_sl t  ++ " is meaningless"
-            return $ NoType
-
-type_check_expression (ExpFCall_Implicit exp args) = do
-    sc_raise $ "TYPECHECK IMPLICIT FCALL NYI"
-    -- __type_check_function_call sname types' param_types rtype
-    return $ NoType
-
-type_check_expression lambda@(ExpLambda rtype vars _ _) = do
-    -- lifting lambda...
-    -- at that step, function verification is performed...
-    new_sname <- lift_lambda lambda
-
-    -- then, the type is that of TypeFunction.
-    rtype' <- verify_type rtype
-
-    if is_type_invalid rtype' then do
-        sc_raise $ "Invalid return type for lambda function."
-        return $ NoType
-    
+    if type_match t1 t2 then do
+        -- prioritizing the type which is not TypeVoid.
+        if t1 == TypeVoid then  return $ (exp, t2)
+        else                    return $ (exp, t1)
     else do
-
-        -- taking the types of the parameters...
-        var_types <- mapM verify_type ((\(VarDecl _ t) -> t) <$> vars)
-        
-        if any is_type_invalid var_types then do
-            sc_raise $ "Invalid parameter type on lambda function..."
-            return $ NoType
-
-        else do
-            return $ TypeFunction var_types rtype'
-
--- Not yet implemented, if any.
-type_check_expression _                     = do
-    sc_raise $ "NOT YET IMPLEMENTED"
-    return $ NoType
+        sc_raise $ "Invalid expression result of " ++ pretty_sl t1 ++ " " ++ bop_str ++ " " ++ pretty_sl t2
+        return $ (exp, TypeVoid)
 
 
-__type_check_function_call :: Identifier -> [IR_Type] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
-__type_check_function_call sname types param_types rtype = do
+verify_fcall :: Identifier -> [IR_Type] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
+verify_fcall sname types param_types rtype = do
 
     if  length param_types /= length types then do
         sc_raise $ "Calling function " ++ show sname ++ " with wrong number of arguments (" ++ show (length types) ++ " out of " ++ show (length param_types) ++ ")"
     else return $ ()
     
     -- independently of the # of args...
-    --types <- mapM type_check_expression exps 
     zipWithM_ (__verify_parameter sname) param_types (zip types [1..])
 
     return $ rtype
@@ -953,20 +956,6 @@ unsolved_type (TypeGeneric g) = do
 unsolved_type t
     | have_generic t    = return $ True
     | otherwise         = return $ False
-
-
-type_check_closed_bop_exp :: String -> IR_Expression -> IR_Expression -> SemanticalContext IR_Type
-type_check_closed_bop_exp bop_str e1 e2 = do
-    t1 <- type_check_expression e1
-    t2 <- type_check_expression e2
-
-    if type_match t1 t2 then do
-        -- prioritizing the type which is not TypeVoid.
-        if t1 == TypeVoid then  return $ t2
-        else                    return $ t1
-    else do
-        sc_raise $ "Invalid expression result of " ++ pretty_sl t1 ++ " " ++ bop_str ++ " " ++ pretty_sl t2
-        return $ TypeVoid
 
 
 lift_lambda :: IR_Expression -> SemanticalContext Identifier
