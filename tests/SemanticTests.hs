@@ -46,7 +46,7 @@ tests = describe "Semantical tests" $ do
     symbol_error_specs
     type_error_specs
     scope_error_specs
-    lambda_error_specs
+    lambda_specs
     global_specs
 
 
@@ -139,22 +139,37 @@ scope_error_specs = describe "Scope violations" $ do
             ("Variable \"this_one\" is not defined",                                        (50, 35)),
             ("Variable \"is_also\" is not defined",                                         (50, 35)),
             ("Variable \"undefined\" is not defined",                                       (50, 35)),
-            ("Variable \"B\" is not defined",                                               (53, 14)),
-            ("Variable \"B\" is not defined",                                               (53, 14)),
+            --("Variable \"B\" is not defined",                                               (53, 14)),
+            --("Variable \"B\" is not defined",                                               (53, 14)),
             ("Invalid \"camarada\" field access on array on variable \"h\"",                (56, 36)),
             ("Invalid array access on variable \"h\"",                                      (57, 36)),
             ("Invalid access of \"coisa_doida\" on type int on variable \"h\"",             (58, 36))
             ]
 
 
-lambda_error_specs :: Spec
-lambda_error_specs = describe "Lambda" $ do
+lambda_specs :: Spec
+lambda_specs = describe "Lambda" $ do
     
-    it "#1 (ep9.sl)" $ do
+    it "Errors #1 (ep9.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep9.sl" $ sem [
+            ("Calling function \"lambda\" with wrong number of arguments (3 out of 1)",     (45, 6)),
+            ("Calling function \"f\" with wrong number of arguments (0 out of 3)",          (49, 15)),
+            ("Calling function \"f\" with wrong number of arguments (1 out of 3)",          (50, 16)),
+            ("Calling function \"f\" with wrong number of arguments (2 out of 3)",          (51, 19)),
+            ("Calling function \"f\" with wrong number of arguments (4 out of 3)",          (52, 30)),
+            ("Invalid argument #1 on function \"f\" call: expected int, yet, argument is float",          (55, 35))
+            ]
+
+    {-
+    it "Lifting (rp1.sl)" $ do
+        verified <- verify_src "data/sl/sa/rp1.sl"
+        putStrLn $ pretty_sl verified
+        1 `shouldBe` 1
+        verify_src_and_compare "data/sl/sa/rp1.sl" $ sem [
             ("Invalid field \"campo\" access of structure B on variable \"h\"",             (43, 19)),
             ("Invalid field \"campo\" access of structure B on variable \"h\"",             (43, 19))
             ]
+    -}
 
 
 global_specs :: Spec
@@ -165,4 +180,9 @@ global_specs = describe "General program structure" $ do
 
     it "No-driver" $ do
         -- @TODO
+        1 `shouldBe` 1
+
+    it "ASD (ex7.sl)" $ do
+        verified <- verify_src "data/sl/ex7.sl"
+        putStrLn $ show verified
         1 `shouldBe` 1

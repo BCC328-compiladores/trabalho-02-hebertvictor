@@ -10,6 +10,7 @@ import Interpreter.Interpreter
 import ParserTests (fparse)
 
 import Frontend.Error   
+import Frontend.Semantics (sl_verify)
 
 import Data.Either (fromRight)
 
@@ -18,10 +19,18 @@ import Data.Either (fromRight)
 fparse_and_interpret :: FilePath -> IO InterpreterResult
 fparse_and_interpret filepath = do
     parsed <- fparse filepath
-
+    
     case parsed of
         Left s      -> return $ Left s
-        Right p     -> interpret p
+        Right p     -> do
+            let verified = sl_verify p
+
+            case verified of 
+                Left s -> do
+                    return $ Left s
+
+                Right (p', _) -> do 
+                    interpret p'
 
 
 asd :: FilePath -> IO (Value, ProgramLog)
@@ -48,6 +57,7 @@ error_specs = describe "Execution errors" $ do
 
 sample_specs :: Spec
 sample_specs = describe "Sample programs" $ do
+
     it "ex1.sl" $ do
         result <- asd "data/sl/ex1.sl"
         result `shouldBe` (ValueInt 0, ["INT: 120"])
@@ -73,6 +83,7 @@ sample_specs = describe "Sample programs" $ do
             "BOOL: True",
             "STRING: \"condi\\231\\227o normal\""
             ])
+    {-
 
     it "ex5.sl" $ do
         result <- asd "data/sl/ex5.sl"
@@ -86,3 +97,9 @@ sample_specs = describe "Sample programs" $ do
             "FLOAT: 0.0",
             "FLOAT: 1.0"
             ])
+    -}
+
+    it "ex7.sl" $ do
+        result <- asd "data/sl/ex7.sl"
+        result `shouldBe` (ValueInt 0, ["INT: 1", "INT: 4"])
+

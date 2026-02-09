@@ -17,8 +17,8 @@ import qualified InterpreterTests
 
 main :: IO ()
 main = hspec $ do
-    --LexerTests.tests
-    -- ParserTests.tests
-    --PrettyTests.tests
+    LexerTests.tests
+    ParserTests.tests
+    PrettyTests.tests
     SemanticTests.tests
-    --InterpreterTests.tests
+    InterpreterTests.tests

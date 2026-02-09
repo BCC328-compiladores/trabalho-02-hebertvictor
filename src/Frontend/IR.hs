@@ -220,7 +220,7 @@ data IR_Expression =
     -- Lambda.
     ExpLambda IR_Type [IR_Var] [Identifier] [IR_LocatedCommand] |
     ExpLiftedLambda Identifier
-    
+
     deriving (Eq, Show, Read)
 
 

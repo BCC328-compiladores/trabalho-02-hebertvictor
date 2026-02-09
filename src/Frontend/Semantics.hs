@@ -114,11 +114,15 @@ data VariableInfo = VariableInfo { -- state
     varstat_name        :: Identifier,
     varstat_type        :: IR_Type,
     varstat_use_count   :: Int,
-    varstat_def_pos     :: SrcPos
+    varstat_def_pos     :: SrcPos,
+
+    -- ID reference.
+    -- As of now, used for lambda lifting...
+    varstat_ref         :: Identifier 
 } deriving (Eq, Show)
 
 varstat_to_vardecl :: VariableInfo -> IR_Var
-varstat_to_vardecl (VariableInfo vname vtype _ _) = VarDecl vname vtype
+varstat_to_vardecl (VariableInfo vname vtype _ _ _) = VarDecl vname vtype
 
 type GenericsMap = Map Identifier IR_Type
 type VariableMap = Map Identifier VariableInfo
@@ -133,11 +137,14 @@ data FunctionContext = FC {
 } deriving (Eq, Show)
 
 
+type CMap = Map Identifier [Identifier]
+
 data SemanticalState = SemanticalState {
     ss_st       :: SymbolTable,
     ss_gm       :: GenericsMap,
     ss_vm       :: VariableMap, -- @TODO actually, this goes to function context?
     ss_fc       :: FunctionContext, -- @TODO rename into SCOPE?!
+    ss_cmap     :: CMap,
     ss_src_pos  :: SrcPos
 } deriving (Eq, Show)
 
@@ -201,21 +208,27 @@ sc_get_fc = SC $ \state -> (ss_fc state, state, [])
 sc_get_pos :: SemanticalContext SrcPos
 sc_get_pos = SC $ \state -> (ss_src_pos state, state, [])
 
+sc_get_cmap :: SemanticalContext CMap 
+sc_get_cmap = SC $ \state -> (ss_cmap state, state, [])
+
 
 sc_set_st :: SymbolTable -> SemanticalContext ()
-sc_set_st st = SC $ \(SemanticalState _ gm vm fc pos) -> ((), SemanticalState st gm vm fc pos, [])
+sc_set_st st = SC $ \(SemanticalState _ gm vm fc cmap pos) -> ((), SemanticalState st gm vm fc cmap　pos, [])
 
 sc_set_gm :: GenericsMap -> SemanticalContext ()
-sc_set_gm gm = SC $ \(SemanticalState st _ vm fc pos) -> ((), SemanticalState st gm vm fc pos, [])
+sc_set_gm gm = SC $ \(SemanticalState st _ vm fc cmap pos) -> ((), SemanticalState st gm vm fc cmap　pos, [])
 
 sc_set_vm :: VariableMap -> SemanticalContext ()
-sc_set_vm vm = SC $ \(SemanticalState st gm _ fc pos) -> ((), SemanticalState st gm vm fc pos, [])
+sc_set_vm vm = SC $ \(SemanticalState st gm _ fc cmap pos) -> ((), SemanticalState st gm vm fc cmap　pos, [])
 
 sc_set_fc :: FunctionContext -> SemanticalContext ()
-sc_set_fc fc = SC $ \(SemanticalState st gm vm _ pos) -> ((), SemanticalState st gm vm fc pos, [])
+sc_set_fc fc = SC $ \(SemanticalState st gm vm _ cmap pos) -> ((), SemanticalState st gm vm fc cmap pos, [])
+
+sc_set_cmap :: CMap -> SemanticalContext ()
+sc_set_cmap cmap = SC $ \(SemanticalState st gm vm fc _ pos) -> ((), SemanticalState st gm vm fc cmap pos, [])
 
 sc_set_pos :: SrcPos -> SemanticalContext ()
-sc_set_pos pos = SC $ \(SemanticalState st gm vm fc _) -> ((), SemanticalState st gm vm fc pos, [])
+sc_set_pos pos = SC $ \(SemanticalState st gm vm fc cmap _) -> ((), SemanticalState st gm vm fc cmap pos, [])
 
 
 sc_raise :: String -> SemanticalContext ()
@@ -235,7 +248,7 @@ sl_verify p = do -- from either
     -- creating the symbol table.
     st <- sl_create_st p
 
-    let (r, final_state, errs) = semantical_analysis_context_run (verify_program p) (SemanticalState st Map.empty Map.empty default_fc (SrcPos (-1, -1)))
+    let (r, final_state, errs) = semantical_analysis_context_run (verify_program p) (SemanticalState st Map.empty Map.empty default_fc Map.empty (SrcPos (-1, -1)))
 
     case errs of
         []  -> Right $ (r, ss_st final_state)
@@ -286,11 +299,11 @@ verify_function f@(FuncDef sname rtype param gtypes body pos) context_vm = do
     sc_set_vm context_vm
     sc_set_pos pos
     
-    mapM_ (\g -> load_generic g TypeVoid) gtypes -- loading generics.
-    mapM_ load_variable param -- loading the variables into memory.
-    
     fc <- sc_get_fc
     sc_set_fc $ FC f False (fc_lambda_count fc)
+
+    mapM_ (\g -> load_generic g TypeVoid) gtypes -- loading generics.
+    mapM_ load_variable param -- loading the variables into memory.
 
     -- verifying each command individually...
     commands' <- mapM verify_command body
@@ -336,7 +349,7 @@ verify_function_final_state = do
     -- at the end of the function, every variable should be used.
     Map.foldrWithKey verify_if_variable_is_accessed (return ()) vm
     where 
-        verify_if_variable_is_accessed _ (VariableInfo vname vtype access_count def_pos) _ = do
+        verify_if_variable_is_accessed _ (VariableInfo vname vtype access_count def_pos vref) _ = do
             sc_set_pos def_pos
             if access_count <= 0 then do
                 fc <- sc_get_fc
@@ -352,6 +365,17 @@ verify_function_final_state = do
 -- Verifying commands --
 ------------------------
 
+set_vref :: Identifier -> Identifier -> SemanticalContext ()
+set_vref vname vref = do
+
+    vm <- sc_get_vm
+    case Map.lookup vname vm of
+        Just (VariableInfo _ vtype use_count def_pos _) ->
+            sc_set_vm $ Map.insert vname (VariableInfo vname vtype use_count def_pos vref) vm
+
+        _ -> return $ ()
+
+
 verify_command :: IR_LocatedCommand -> SemanticalContext IR_LocatedCommand
 verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
 
@@ -359,6 +383,8 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
     
     (exp', exp_type)    <- verify_expression exp
     vtype'              <- verify_type vtype
+
+    exp_type <- verify_type exp_type
 
     if type_match vtype' exp_type then
         -- ok, expected type.
@@ -387,6 +413,17 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
 
     -- loading the variable.
     load_variable (VarDecl vname vtype')
+
+    case exp_type of 
+        TypeGeneric _ -> error "VTMNC"
+        _ -> return ()
+
+    -- POR ENQUANTO TÁ BOM.
+    case exp' of
+        ExpLiftedLambda sname -> do
+            set_vref vname sname
+
+        _ -> return $ ()
 
     return $ LC (VarDef (VarDecl vname vtype') exp') pos
 
@@ -479,6 +516,18 @@ verify_command (LC (Scan exp) pos) = do
 -- Verifying variable scope and etc. --
 ----------------------------------------
 
+set_captures :: Identifier -> [Identifier] -> SemanticalContext ()
+set_captures sname captures = do
+    cmap <- sc_get_cmap
+
+    case Map.lookup sname cmap of
+        Just captures' -> 
+            sc_set_cmap $ Map.insert sname (captures' ++ captures) cmap
+
+        _ -> 
+            sc_set_cmap $ Map.insert sname captures cmap
+
+
 load_generic :: Identifier -> IR_Type -> SemanticalContext ()
 load_generic g t = do
     gm <- sc_get_gm
@@ -496,10 +545,27 @@ load_variable (VarDecl vname vtype) = do
     case Map.lookup vname vm of 
         Nothing -> do
             -- OK
-            sc_set_vm (Map.insert vname (VariableInfo vname vtype 0 pos) vm)
+            sc_set_vm (Map.insert vname (VariableInfo vname vtype 0 pos "undefined") vm)
         
-        Just (VariableInfo _ t _ def_pos) -> do
-            sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl t ++ "), first defined at " ++ pretty_sl def_pos ++ ", is redefined with type " ++ pretty_sl vtype
+        Just (VariableInfo _ t _ def_pos vref) -> do
+
+            fc <- sc_get_fc
+            cmap <- sc_get_cmap
+
+            u <- case Map.lookup (symbol_name $ fc_statement fc) cmap of
+                Just xs     -> return $ any (== vname) xs
+                _           -> return $ False
+
+            if u then do
+                return $ ()
+            else
+                sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl t ++ "), first defined at " ++ pretty_sl def_pos ++ ", is redefined with type " ++ pretty_sl vtype
+
+
+function_type :: IR_Statement -> IR_Type
+function_type (FuncDef _ rtype parameters _ _ _) = TypeFunction param_types rtype where
+    param_types = (\(VarDecl _ t ) -> t) <$> parameters
+function_type _ = NoType
 
 
 -- Structurally similar to `ic_pm_read`.
@@ -512,16 +578,29 @@ verify_access access@(VarAccess vname next_access) = do
     vm <- sc_get_vm
     case Map.lookup vname vm of
         Nothing -> do
-            sc_raise $ "Variable " ++ show vname ++ " is not defined"
-            return $ (access, NoType)
+            -- is it possibly a function then?
+            -- (functional behavior...)
 
-        Just (VariableInfo _ vtype access_count def_pos)  -> do
+            st <- sc_get_st
+            case Map.lookup vname st of
+                Just f      -> do 
+                    return $ (access, function_type f)
+                _           -> do
+                    sc_raise $ "Variable " ++ show vname ++ " is not defined"
+                    return $ (access, NoType)
+
+        Just (VariableInfo _ vtype access_count def_pos vref)  -> do
             -- is defined!
             
             -- variable is accessed one more time!
-            sc_set_vm $ Map.insert vname (VariableInfo vname vtype (access_count + 1) def_pos) vm
+            sc_set_vm $ Map.insert vname (VariableInfo vname vtype (access_count + 1) def_pos vref) vm
 
-            __access_type vname next_access vtype
+            (va, vt) <- __access_type vname next_access vtype
+            return $ (access, vt)
+
+verify_access access@_ = do
+    sc_raise $ "Invalid variable access: " ++ pretty_sl access ++ show access
+    return $ (access, NoType)
 
 -- Retrieves the type of the variable access.
 __access_type :: Identifier -> IR_VarAccess -> IR_Type -> SemanticalContext (IR_VarAccess, IR_Type)
@@ -695,7 +774,7 @@ verify_type t@(TypeGeneric g) = do
         Nothing -> do
             -- worse yet: not even a generic.
             -- then it is probably a struct.
-
+            
             st <- sc_get_st
             case Map.lookup g st of
                 Just (StructDef _ _ _) -> do
@@ -709,6 +788,12 @@ verify_type t@(TypeGeneric g) = do
                     return $ NoType
 
         Just t -> return $ t
+
+verify_type t@(TypeArray base_type exps) = do
+    base_type' <- verify_type base_type
+    return $ TypeArray base_type' exps
+
+-- FALTA FAZER PRA FUNÇÃO TAMBÉM,
 
 -- else, there's nothing to be done.        
 verify_type t = return $ t 
@@ -733,7 +818,7 @@ verify_expression exp@(ExpFCall sname args) = do
     st <- sc_get_st
     pos <- sc_get_pos
     case Map.lookup sname st of
-        -- ok, it was a functoin already there...
+        -- ok, it was a function already there...
         Just (FuncDef _ rtype param _ _ _)  -> do
             let exp' = ExpFCall sname args'
             let param_types = (\(VarDecl _ t) -> t) <$> param
@@ -752,14 +837,23 @@ verify_expression exp@(ExpFCall sname args) = do
             -- then it is probably a local function.
             vm <- sc_get_vm
             case Map.lookup sname vm of
-                Just (VariableInfo sname' (TypeFunction param_types rtype) _ _) -> do
+                Just (VariableInfo _ (TypeFunction param_types rtype) _ _ vref) -> do
+                    
                     -- creating dummy access...
-                    let exp' = ExpFCall sname' args'
-                    rtype' <- verify_type rtype
-
                     verify_access (VarAccess sname VarAccessNothing)
+
+                    rtype' <- verify_type rtype
                     verify_fcall sname types' param_types rtype'
-                    return $ (exp, rtype')
+
+                    cmap <- sc_get_cmap
+                    case Map.lookup vref cmap of
+                        Just captures -> do
+                            let scoped_args = (\s -> ExpVariable (VarAccess sname VarAccessNothing)) <$> captures
+                            let exp' = ExpFCall sname (args' ++ scoped_args)
+                            return $ (exp', rtype')
+
+                        _ -> do
+                            return $ (exp, rtype')
 
                 y   -> do
                     -- then the function really doesn't exists whatsoever.
@@ -769,13 +863,14 @@ verify_expression exp@(ExpFCall sname args) = do
 
 -- literals.
 verify_expression exp@(ExpNothing)          = return $ (ExpNothing, TypeVoid)
-verify_expression exp@(ExpLitInteger _)     = return $ (reduce_expression exp, TypeInt)
-verify_expression exp@(ExpLitFloating _)    = return $ (reduce_expression exp, TypeFloat)
-verify_expression exp@(ExpLitBoolean _)     = return $ (reduce_expression exp, TypeBool)
-verify_expression exp@(ExpLitString _)      = return $ (reduce_expression exp, TypeString)
+verify_expression exp@(ExpLitInteger _)     = return $ (exp, TypeInt)
+verify_expression exp@(ExpLitFloating _)    = return $ (exp, TypeFloat)
+verify_expression exp@(ExpLitBoolean _)     = return $ (exp, TypeBool)
+verify_expression exp@(ExpLitString _)      = return $ (exp, TypeString)
 
 -- bops.
 verify_expression exp@(ExpSum e1 e2)        = verify_expression_closed_bop "+" e1 e2    ExpSum
+verify_expression exp@(ExpSub e1 e2)        = verify_expression_closed_bop "-" e1 e2    ExpSub
 verify_expression exp@(ExpMul e1 e2)        = verify_expression_closed_bop "*" e1 e2    ExpMul
 verify_expression exp@(ExpDiv e1 e2)        = verify_expression_closed_bop "/" e1 e2    ExpDiv
 verify_expression exp@(ExpIntDiv e1 e2)     = verify_expression_closed_bop "//" e1 e2   ExpIntDiv
@@ -783,12 +878,15 @@ verify_expression exp@(ExpMod e1 e2)        = verify_expression_closed_bop "%" e
 verify_expression exp@(ExpPow e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpPow
 verify_expression exp@(ExpNegative e)       = verify_expression e
 
-verify_expression exp@(ExpEq e1 e2)         = verify_expression_closed_bop "^" e1 e2    ExpEq
-verify_expression exp@(ExpNeq e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpNeq
-verify_expression exp@(ExpGt e1 e2)         = verify_expression_closed_bop "^" e1 e2    ExpGt
-verify_expression exp@(ExpGeq e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpGeq
-verify_expression exp@(ExpLt e1 e2)         = verify_expression_closed_bop "^" e1 e2    ExpLt
-verify_expression exp@(ExpLeq e1 e2)        = verify_expression_closed_bop "^" e1 e2    ExpLeq
+verify_expression exp@(ExpAnd e1 e2)        = verify_expression_bool_bop ExpAnd e1 e2 exp
+verify_expression exp@(ExpOr e1 e2)         = verify_expression_bool_bop ExpOr e1 e2 exp
+
+verify_expression exp@(ExpEq e1 e2)         = verify_expression_relational ExpEq e1 e2  exp
+verify_expression exp@(ExpNeq e1 e2)        = verify_expression_relational ExpNeq e1 e2 exp
+verify_expression exp@(ExpGt e1 e2)         = verify_expression_relational ExpGt e1 e2  exp
+verify_expression exp@(ExpGeq e1 e2)        = verify_expression_relational ExpGeq e1 e2 exp
+verify_expression exp@(ExpLt e1 e2)         = verify_expression_relational ExpLt e1 e2  exp
+verify_expression exp@(ExpLeq e1 e2)        = verify_expression_relational ExpLeq e1 e2 exp
 
 verify_expression exp@(ExpLIncr e)          = verify_expression e -- @TODO
 verify_expression exp@(ExpRIncr e)          = verify_expression e -- @TODO
@@ -796,8 +894,8 @@ verify_expression exp@(ExpLDecr e)          = verify_expression e -- @TODO
 verify_expression exp@(ExpRDecr e)          = verify_expression e -- @TODO
 
 verify_expression exp@(ExpVariable va)                  = do
-    (_, vtype) <- verify_access va
-    return $ (exp, vtype)
+    (access, vtype) <- verify_access va
+    return $ (ExpVariable access, vtype)
 
 verify_expression exp@(ExpStructInstance sname args)    = do
     verified_args_and_types <- mapM verify_expression args
@@ -806,12 +904,12 @@ verify_expression exp@(ExpStructInstance sname args)    = do
 
 verify_expression exp@(ExpArrayInstancing args)         = do
     verified_args_and_types <- mapM verify_expression args
-    let args = fst <$> verified_args_and_types
+    let args' = fst <$> verified_args_and_types
     let arg_types = snd <$> verified_args_and_types
 
-    let exp' = ExpArrayInstancing args
+    let exp' = ExpArrayInstancing args'
 
-    case args of 
+    case args' of 
         []      -> do
             sc_raise $ "Null-array instancing. What about a no?"
             return $ (exp', NoType)
@@ -825,7 +923,7 @@ verify_expression exp@(ExpArrayInstancing args)         = do
                 case t of
                     TypeArray b array_exps  -> return $ (exp', TypeArray b ([array_size_expr] ++ array_exps))
                     _                       -> return $ (exp', TypeArray t [array_size_expr])
-                    where array_size_expr = ExpLitInteger (toInteger $ length args)
+                    where array_size_expr = ExpLitInteger (toInteger $ length args')
 
 verify_expression exp@(ExpNew t)                        = do
     case t of
@@ -855,14 +953,31 @@ verify_expression exp@(ExpNew t)                        = do
             return $ (exp, NoType)
 
 verify_expression exp@(ExpFCall_Implicit fcall_exp args) = do
-    sc_raise $ "TYPECHECK IMPLICIT FCALL NYI"
-    -- __type_check_function_call sname types' param_types rtype
-    return $ (exp, NoType)
+    let rexp = reduce_expression fcall_exp
+
+    -- well, the expression MUST be a lambda...
+    -- no questions asked.
+    case rexp of
+        ExpLambda rtype param captures cmds -> do
+            
+            verified_args <- mapM verify_expression args
+            let args' = fst <$> verified_args
+            let arg_types = snd <$> verified_args
+            let param_types = (\(VarDecl _ t) -> t) <$> param
+
+            rtype' <- verify_type rtype
+            verify_fcall "lambda" arg_types param_types rtype'
+
+            return $ (ExpFCall_Implicit rexp args', rtype')
+
+        _ -> do
+            sc_raise $ "Instant evaluation of non-lambda expression: " ++ pretty_sl exp
+            return $ (exp, NoType)
 
 verify_expression exp@(ExpLambda rtype vars _ _) = do
     -- lifting lambda...
     -- at that step, function verification is performed...
-    new_sname <- lift_lambda exp
+    sname <- lift_lambda exp
 
     -- then, the type is that of TypeFunction.
     rtype' <- verify_type rtype
@@ -870,7 +985,7 @@ verify_expression exp@(ExpLambda rtype vars _ _) = do
     if is_type_invalid rtype' then do
         sc_raise $ "Invalid return type for lambda function."
         return $ (exp, NoType)
-    
+        
     else do
 
         -- taking the types of the parameters...
@@ -881,27 +996,23 @@ verify_expression exp@(ExpLambda rtype vars _ _) = do
             return $ (exp, NoType)
 
         else do
-            return $ (exp, TypeFunction var_types rtype')
+            -- 
+            return $ (ExpLiftedLambda sname, TypeFunction var_types rtype')
 
-{-
--- To verify the expression, it is first reduced and then its typing is verified.
-verify_expression exp = do
-    let reduced_exp = reduce_expression exp
-    --sc_raise $ ">>> VERIFY_EXPRESSION TYPE CHECK " ++ pretty_sl reduced_exp
+verify_expression exp@(ExpLiftedLambda sname) = do
+    st <- sc_get_st
+    case Map.lookup sname st of
+        Just (FuncDef _ rtype _ _ _ _) -> return $ (exp, rtype)
+        Nothing -> do
+            sc_raise $ "INTERNAL: INVALID LIFTED LAMBDA"
+            return $ (exp, NoType)
 
-    vtype <- type_check_expression reduced_exp
-
-    --sc_raise $ "<<< VERIFY_EXPRESSION VERIFY TYPE " ++ pretty_sl vtype
-    vtype' <- verify_type vtype
-    return $ (reduced_exp, vtype')
-    --return $ (reduced_exp, vtype)
--}
 
 verify_expression_closed_bop :: String -> IR_Expression -> IR_Expression -> (IR_Expression -> IR_Expression -> IR_Expression) -> SemanticalContext (IR_Expression, IR_Type)
 verify_expression_closed_bop bop_str e1 e2 constructor = do
-    (e1', t1) <- verify_expression e1
-    (e2', t2) <- verify_expression e2
-    let exp = constructor e1' e2'
+    (e1', t1) <- verify_expression (reduce_expression e1)
+    (e2', t2) <- verify_expression (reduce_expression e2)
+    let exp = reduce_expression $ constructor e1' e2'
 
     if type_match t1 t2 then do
         -- prioritizing the type which is not TypeVoid.
@@ -909,7 +1020,39 @@ verify_expression_closed_bop bop_str e1 e2 constructor = do
         else                    return $ (exp, t1)
     else do
         sc_raise $ "Invalid expression result of " ++ pretty_sl t1 ++ " " ++ bop_str ++ " " ++ pretty_sl t2
-        return $ (exp, TypeVoid)
+        return $ (exp, NoType)
+
+
+verify_expression_bool_bop constructor e1 e2 exp = do 
+
+    (e1', t1) <- verify_expression (reduce_expression e1)
+    (e2', t2) <- verify_expression (reduce_expression e2)
+    let exp' = reduce_expression $ constructor e1' e2'
+
+    case t1 of
+        TypeBool -> do
+            case t2 of 
+                TypeBool -> return $ (exp', TypeBool)
+                _ ->  do
+                    sc_raise $ "Non-boolean on second term of expression " ++ pretty_sl exp
+                    return $ (exp', NoType)
+
+        _ -> do
+            sc_raise $ "Non-boolean on first term of expression " ++ pretty_sl exp
+            return $ (exp', NoType)
+
+
+verify_expression_relational constructor e1 e2 exp = do
+    (e1', t1) <- verify_expression (reduce_expression e1)
+    (e2', t2) <- verify_expression (reduce_expression e2)
+    let exp' = reduce_expression $ constructor e1' e2'
+
+    if type_match t1 t2 then do
+        return $ (exp', TypeBool)
+    else do
+        sc_raise $ "Relational expression " ++ pretty_sl exp ++ " of types (" ++ pretty_sl t1 ++ ", " ++ pretty_sl t2 ++ ")"
+        return $ (exp, NoType)
+
 
 
 verify_fcall :: Identifier -> [IR_Type] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
@@ -949,7 +1092,7 @@ function_rtype_match rtype t = rtype `type_eq` t || t == TypeVoid || t == NoType
 -- fala se o tipo não está resolvido (se ele for genérico).
 unsolved_type :: IR_Type -> SemanticalContext Bool
 unsolved_type (TypeGeneric g) = do
-    -- @TODO buscar o tipo pra ver se tá resolvido de fato.c
+    -- @TODO buscar o tipo pra ver se tá resolvido de fato...
     -- sem inferência, qualquer genérico não tá resolvido.
     return $ True
 
@@ -975,6 +1118,8 @@ lift_lambda lambda@(ExpLambda rtype vars captures cmds) = do
     let captured = Map.restrictKeys vm $ Set.fromList captures
     let extended_vars = vars ++ [varstat_to_vardecl v | c <- captures, Just v <- [Map.lookup c captured]]
 
+    set_captures sname captures
+
     statement <- verify_function (FuncDef {
         symbol_name = sname,
         function_rtype = rtype,
@@ -983,9 +1128,10 @@ lift_lambda lambda@(ExpLambda rtype vars captures cmds) = do
         function_body = cmds,
         symbol_pos = pos
     }) captured
-
+    
     sc_set_st $ st_insert statement st
 
+    --sc_raise $ ">>> LIFTED " ++ show sname 
     return $ sname
 
 

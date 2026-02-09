@@ -42,6 +42,7 @@ library
         Frontend.Parser
         Frontend.Pretty
         Frontend.PrettyTree
+        Frontend.Value
         Frontend.Semantics
         Interpreter.Interpreter
 
@@ -73,6 +74,7 @@ executable HarmonicalVortex
         Frontend.Parser
         Frontend.Pretty
         Frontend.PrettyTree
+        Frontend.Value
         Frontend.Semantics
         Interpreter.Interpreter
 
@@ -114,11 +116,14 @@ test-suite data-tests
         Frontend.Parser
         Frontend.Pretty
         Frontend.PrettyTree
+        Frontend.Value
         Frontend.Semantics
         Interpreter.Interpreter
         LexerTests
         ParserTests
         PrettyTests
+        SemanticTests
+        InterpreterTests
 
     build-depends:
         base >= 4.17,

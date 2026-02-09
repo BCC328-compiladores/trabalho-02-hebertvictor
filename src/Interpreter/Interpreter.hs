@@ -44,28 +44,25 @@ interpret_string src_code = do
 
 
 interpret :: IR_Program -> IO InterpreterResult
-interpret program = do
-
-    case sl_verify program of
-        Left err -> return $ Left err
+interpret p__ = do
+    case sl_verify p__ of
+        Left err -> do 
+            print err
+            return $ Left err
 
         Right (verified_program, st) -> do
             start_time <- getCurrentTime
-
+            
             result <- interpreter_context_run (ic_interpret_program verified_program) (base_is st)
 
             end_time <- getCurrentTime    
                     
             -- @TODO
             case result of
-                Left err -> 
-                    return (ValueUnknown)
-                Right _ -> 
-                    return (ValueUnknown)
-
+                Left err -> return (ValueUnknown)
+                Right _ ->  return (ValueUnknown)
+            
             putStrLn $ "End. Elapsed: " ++ show (diffUTCTime end_time start_time) ++ "."
-            --print result
-
             return $ result
 
 
@@ -291,24 +288,22 @@ st_get_main st =
 
 -- takes in the IR function description and a list of values (its args).
 ic_interpret_function :: IR_Statement -> [Value] -> InterpreterContext (Value, ProgramMemory)
-ic_interpret_function (FuncDef fname rtype param gtypes body _) args = do
-    --ic_io $ putStrLn $ fname ++ show args
+ic_interpret_function f@(FuncDef fname rtype param gtypes body _) args = do
+    --ic_io $ putStrLn $ "=== Executando função:"
+    --ic_io $ putStrLn $ pretty_sl f
 
     -- saving older program state...    
     gm <- ic_get_gm
     pm <- ic_get_pm
+    
+    ic_set_pm $ base_pm
 
     -- loading the function context (arguments).
     ic_function_load_args args param fname
-    
-    --ic_io $ print $ "Generics: " ++ show gm
-    --ic_io $ putStrLn $ fname ++ show args
-    --ic_io $ putStrLn $ "PM: " ++ show pm
 
     -- running command list (function's return will be saved there.)
     (_, value) <- ic_interpret_command_list body
-    
-    --ic_io $ putStrLn $ fname ++ show args ++ " -> " ++ show value
+    --ic_io $ putStrLn $ "=== Terminou de executar a função "
 
     pm' <- ic_get_pm
     
@@ -390,7 +385,6 @@ overload_generic vtype (TypeGeneric g) = do
         -- genérico ainda não tá sobrecarregado.
         Nothing ->  do
             
-            --ic_io $ putStrLn $ g ++ " <- " ++ show vtype
             ic_set_gm $ Map.insert g vtype gm
             return $ ()
         Just t  -> 
@@ -408,6 +402,7 @@ overload_generic _ _ = return $ ()
 é_tipo_válido (ValueBool _) TypeBool                = True
 é_tipo_válido (ValueArray b) (TypeArray t _)        = é_tipo_válido (b !! 0) t
 é_tipo_válido (ValueFunction n) (TypeFunction _ _)  = True
+é_tipo_válido (ValueStruct sname1 _) (TypeStruct sname2) = sname1 == sname2
 é_tipo_válido _ _                                   = False
 
 tipo_compatível :: IR_Type -> IR_Type -> Bool
@@ -437,21 +432,22 @@ to_value (TypeArray base [exp]) = do
                 
         _          -> ic_raise $ "Invalid index type: " ++ show value
 to_value (TypeArray _ _)    = error "NYI"
-to_value (TypeGeneric g)    = do
+to_value (TypeGeneric g) = do
+    gm <- ic_get_gm
+    case Map.lookup g gm of
+        Just t  -> to_value t
+        _       -> ic_raise $ "Generic type " ++ show g ++ " is unknown"
+
+to_value (TypeStruct sname)    = do
     -- verificando se tá na tabela de símbolos (para estruturas)...
     st <- ic_get_st
 
-    case Map.lookup g st of
+    case Map.lookup sname st of
         Just (StructDef sname fields _)   -> do
             value_list <- mapM (\(VarDecl _ field_type) -> to_value field_type) fields
             return $ ValueStruct sname $ value_list
         _                               -> do
-            -- if it is not a structure, then cit is probably a generic itself.
-
-            gm <- ic_get_gm
-            case Map.lookup g gm of
-                Just t  -> to_value t
-                _       -> ic_raise $ "Generic type " ++ show g ++ " is unknown"
+            ic_raise $ "Struct " ++ show sname ++ " is unknown"
 
 
 
@@ -463,8 +459,7 @@ to_value (TypeGeneric g)    = do
 ic_interpret_command_list :: [IR_LocatedCommand] -> InterpreterContext (Bool, Value)
 ic_interpret_command_list [] = return $ (False, ValueUnknown)
 ic_interpret_command_list (cmd:cmds) = do
-    --ic_io $ putStrLn $ "EXECUTING " ++ show cmd ++ " (" ++ show cmds ++ ")"
-
+    --ic_io $ putStrLn $ "=== Vô executar " ++ pretty_sl cmd
     (does_return, v) <- ic_interpret_command cmd
 
     case does_return of 
@@ -472,23 +467,23 @@ ic_interpret_command_list (cmd:cmds) = do
         
         -- in case the command was a return, then 'halts' the list execution and
         -- propagates the value.
-        True    -> return $ (True, v)
+        True    -> do
+            return $ (True, v)
 
 
 -- Interprets a command, and returns whether the result is returned, 
 -- and the associated computed value.
 ic_interpret_command :: IR_LocatedCommand -> InterpreterContext (Bool, Value)
 ic_interpret_command (LC (VarDef (VarDecl vname vtype) vexp) _) = do
-
-    --ic_io $ putStrLn $ "Defining variable `" ++ vname ++ "` (" ++ show vtype ++ ")"
-    --ic_io $ putStrLn $ "=== ExpStructInstance: " ++ show lvalues
+    --ic_io $ putStrLn $ "=== Definindo variável `" ++ vname ++ "` (" ++ show vtype ++ ")"
     
     (value, _) <- ic_interpret_expression vexp
     case é_tipo_válido value vtype of
         False   -> do
             -- x : int;
             -- ValueUnknown passa.
-            if value == ValueUnknown then do
+
+            if value == ValueUnknown then do                
                 value' <- to_value vtype 
                 pm <- ic_get_pm
                 ic_set_pm (Map.insert vname value' pm)
@@ -498,24 +493,21 @@ ic_interpret_command (LC (VarDef (VarDecl vname vtype) vexp) _) = do
                 pm <- ic_get_pm
                 ic_set_pm (Map.insert vname value pm)
                 return $ (False, value)
-
+            
             else ic_raise $ "Type incompatibility: " ++ show value ++ " with " ++ show vtype ++ " (variable: " ++ show vname ++ ")"
 
         True    -> do
             pm <- ic_get_pm
             ic_set_pm (Map.insert vname value pm)
 
-            --ic_io $ putStrLn $ "CALA A BOCA E SOME DA MINHA FRENTE: " ++ show value ++ " de " ++ vname
-            --pm' <- ic_get_pm
-            --ic_io $ putStrLn $ show pm'
-
             return $ (False, value)
 
 
 ic_interpret_command (LC (Return exp) _) = do
-    --ic_io $ putStrLn $ "<- " ++ show exp
 
     (lvalue, _) <- ic_interpret_expression exp
+
+    --ic_io $ putStrLn $ "=== Retorno: " ++ pretty_sl exp ++ "--->" ++ show lvalue
     return $ (True, lvalue)
 
 
@@ -523,6 +515,8 @@ ic_interpret_command (LC (Assignment varaccess exp) _) = do
     -- for instance, for assignment, the reference doesn't matter.
     -- it may be important if pointers turn out to be a language's feature thought.
     (lvalue, _) <- ic_interpret_expression exp
+    
+    --ic_io $ putStrLn $ "=== Atribuindo " ++ pretty_sl exp ++ "(" ++ show lvalue ++ ") para " ++ pretty_sl varaccess
     non_return_command $ ic_pm_write varaccess lvalue
 
 
@@ -540,7 +534,8 @@ ic_interpret_command (LC (If exp cmds1 cmds2) _) = do
 ic_interpret_command w@(LC (While exp cmds) _) = do
 
     (lvalue, _) <- ic_interpret_expression exp
-    
+    --ic_io $ putStrLn $ "=== Cabeça do While: " ++ show lvalue
+
     case lvalue of 
         ValueBool b -> do
             -- depending on the boolean-value, executes
@@ -813,9 +808,11 @@ ic_interpret_expression (ExpFCall fname params) = do
 
 
 ic_interpret_expression (ExpStructInstance sname exps) = do
-
     -- getting the lvalues.
     values <- mapM ic_interpret_expression exps 
+
+    -- ic_io $ putStrLn $ "=== Instanciando estrutura: " ++ sname ++ "; valores = " ++ show values
+
     let lvalues = fst <$> values
 
     return $ (ValueStruct sname lvalues, ReferênciaNão)
