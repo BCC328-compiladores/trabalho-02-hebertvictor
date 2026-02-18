@@ -6,10 +6,9 @@
 {-# LANGUAGE InstanceSigs #-} -- for which doesn't allow by default...
 
 module Frontend.Error ( ErrorType(..),
-                        Error(..),
-                        SrcPos(..)) where
+                        Error(..)) where
 
-import Frontend.Token
+import Frontend.Token ( SrcPos(..) )
 import Frontend.Pretty
 
 

@@ -72,7 +72,7 @@ tokens :-
 
     <0> "@print"            { tokenize_simple T_IO_Print }
     <0> "@scan"             { tokenize_simple T_IO_Scan }
-    <0> "@rc"                { tokenize_simple T_IO_RC }
+    <0> "@rc"               { tokenize_simple T_IO_RC }
 
     -- Enclosures.
     <0> "("                 { tokenize_simple T_LParenthesis }
