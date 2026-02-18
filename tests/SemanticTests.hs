@@ -8,6 +8,7 @@ module SemanticTests (tests) where
 import Test.Hspec
 import ParserTests (fparse)
 
+import Frontend.Token(SrcPos(..))
 import Frontend.Error
 import Frontend.IR
 import Frontend.Semantics   

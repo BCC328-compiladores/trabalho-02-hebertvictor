@@ -2,10 +2,12 @@
     @file       src/Frontend/Token.hs
     @details    Defines the token structure for the frontend.
 -}
+{-# LANGUAGE InstanceSigs #-} -- for which doesn't allow by default...
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
 module Frontend.Token where
+import Frontend.Pretty
 
 
 newtype SrcPos = SrcPos (Int, Int) 

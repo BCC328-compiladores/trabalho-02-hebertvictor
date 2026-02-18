@@ -8,6 +8,7 @@
 module ParserTests (tests, fparse) where
 
 import Test.Hspec
+import Frontend.Token(SrcPos(..))
 import Frontend.Error
 import Frontend.Parser
 import Frontend.IR

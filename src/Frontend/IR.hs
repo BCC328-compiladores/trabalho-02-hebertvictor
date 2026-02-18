@@ -9,7 +9,7 @@
 
 module Frontend.IR where
 
-import Frontend.Error
+import Frontend.Token
 import Frontend.Pretty
 
 

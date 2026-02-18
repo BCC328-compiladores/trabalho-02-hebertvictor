@@ -9,23 +9,23 @@ module Interpreter.Interpreter (    interpret,
                                     get_rc_and_log, 
                                     InterpreterResult,
                                     ProgramLog, 
+                                    InterpreterState(..),
                                     Value(..)) where
 
 import Frontend.Value
 
-import Frontend.Error
+import Frontend.Error ( Error(Error), ErrorType(ExecutionError) )
+import Frontend.Token
 import Frontend.IR
 import Frontend.Semantics
-import Frontend.Parser
-import Frontend.Pretty
+import Frontend.Parser ( parse_sl )
 
 import Data.Map
-import Data.Either
 import Data.List (elemIndex)
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import qualified Data.Map as Map
 
-import Control.Monad (zipWithM)
+-- import Control.Monad (zipWithM)
 
 -- @todo use the except monad, perhaps maybe...
 --import Control.Monad.Trans.Except
@@ -46,34 +46,37 @@ interpret_string src_code = do
 interpret :: IR_Program -> IO InterpreterResult
 interpret p__ = do
     case sl_verify p__ of
-        Left err -> do 
-            print err
+        Left err -> do
+            --print err
             return $ Left err
 
-        Right (verified_program, st) -> do
+        Right (_, st) -> do
             start_time <- getCurrentTime
             
-            result <- interpreter_context_run (ic_interpret_program verified_program) (base_is st)
+            result <- interpreter_context_run ic_interpret_program (base_is st)
 
-            end_time <- getCurrentTime    
-                    
-            -- @TODO
-            case result of
-                Left err -> return (ValueUnknown)
-                Right _ ->  return (ValueUnknown)
-            
+            end_time <- getCurrentTime
+
             putStrLn $ "End. Elapsed: " ++ show (diffUTCTime end_time start_time) ++ "."
-            return $ result
+            
+            case result of
+                Left err -> print err -- TODO
+                Right (v, _) -> do
+                    putStrLn $ "Result: " ++ show v
+                    return ()
+
+            return result
+
 
 
 -- @TODO pra facilitar os testes
 interpret_expression :: IR_Expression -> IO ()
-interpret_expression exp = 
+interpret_expression _exp =
     print "vazio"
 
 
 get_rc_and_log :: InterpreterResult -> (Value, ProgramLog)
-get_rc_and_log (Left err) = (ValueUnknown, [])
+get_rc_and_log (Left _) = (ValueUnknown, [])
 get_rc_and_log (Right (v, state)) = (v, is_log state)
 
 
@@ -112,10 +115,10 @@ newtype InterpreterContext v = IC {
 
 
 base_is :: SymbolTable -> InterpreterState
-base_is st = InterpreterState st pm gm log pos where
+base_is st = InterpreterState st pm gm _log _pos where
     pm = base_pm
-    log = []
-    pos = SrcPos (- 1, - 1)
+    _log = []
+    _pos = SrcPos (- 1, - 1)
     gm = Map.empty
 
 
@@ -134,8 +137,8 @@ ic_get_pm = IC $ \state ->
 
 
 ic_set_pm :: ProgramMemory -> InterpreterContext ()
-ic_set_pm pm = IC $ \(InterpreterState st _ gm log pos) ->
-    return $ Right ((), InterpreterState st pm gm log pos)
+ic_set_pm pm = IC $ \(InterpreterState st _ gm _log _pos) ->
+    return $ Right ((), InterpreterState st pm gm _log _pos)
 
 
 ic_get_gm :: InterpreterContext GenericsMap
@@ -143,12 +146,13 @@ ic_get_gm = IC $ \state ->
     return $ Right (is_gm state, state)
 
 ic_set_gm :: GenericsMap -> InterpreterContext ()
-ic_set_gm gm = IC $ \(InterpreterState st pm _ log pos) ->
-    return $ Right ((), InterpreterState st pm gm log pos)
+ic_set_gm gm = IC $ \(InterpreterState st pm _ _log _pos) ->
+    return $ Right ((), InterpreterState st pm gm _log _pos)
 
 ic_raise :: String -> InterpreterContext v
-ic_raise error_msg = IC $ \_ -> 
-    return $ Left (Error ExecutionError error_msg (SrcPos (-1, -1)))
+ic_raise error_msg_ = IC $ \state -> do
+    --_ <- return $ Right $ ic_print $ error_msg_
+    return $ Left (Error ExecutionError error_msg_ (is_src_pos state))
 
 
 -- scapes the IC context to perform IO...
@@ -165,11 +169,11 @@ ic_if False _ action2   = action2
 
 -- perform the IO and register the string on the program log.
 ic_log :: String -> (String -> IO v) -> InterpreterContext v
-ic_log string io = IC $ \i@(InterpreterState st pm gm log pos) -> do
+ic_log string io = IC $ \(InterpreterState st pm gm _log _pos) -> do
     x <- io string
 
     -- constrói novo estado.
-    return $ Right (x, InterpreterState st pm gm (log ++ [string]) pos)
+    return $ Right (x, InterpreterState st pm gm (_log ++ [string]) _pos)
 
 
 
@@ -248,28 +252,30 @@ instance Monad InterpreterContext where
 -------------
 
 -- Executes a IR_Program; returns the main's RC.
-ic_interpret_program :: IR_Program -> InterpreterContext Value
-ic_interpret_program program = do
+ic_interpret_program :: InterpreterContext Value
+ic_interpret_program = do
     st <- ic_get_st
 
     -- extracting the main function,
     let     maybe_main = st_get_main st
     case    maybe_main of
-        Nothing     -> ic_raise "Invalid `main`." -- @TODO more informative error.
-        Just main   -> do
+        Nothing     -> ic_raise $ "Invalid `main`." -- @TODO more informative error.
+        Just main@(FuncDef _ _ _ _ _ _) -> do
             let n_parameters = length $ function_parameters main :: Int
 
-            -- deciding how to run it depending on the # of parameters...    
-            (rc, _) <- if n_parameters == 0 then
+            -- deciding how to run it depending on the # of parameters...
+            (rc, _) <- if n_parameters == 0 then do
                 ic_interpret_function main []
 
             else if (n_parameters == 2) then
                 ic_interpret_function main [ValueInt 2, ValueArray [ValueString "programa", ValueString "qualquer coisa"]]
 
             else
-                ic_raise $  "ERRO DE ARGUMENTOS DA MAIN"
+                ic_raise $ "ERRO DE ARGUMENTOS DA MAIN"
 
             return $ rc
+        
+        _ -> ic_raise $ "`main` defined as struct..."
 
 
 -- Attempts getting the function `main` on the ST.
@@ -288,7 +294,7 @@ st_get_main st =
 
 -- takes in the IR function description and a list of values (its args).
 ic_interpret_function :: IR_Statement -> [Value] -> InterpreterContext (Value, ProgramMemory)
-ic_interpret_function f@(FuncDef fname rtype param gtypes body _) args = do
+ic_interpret_function (FuncDef fname rtype param gtypes body _) args = do
     --ic_io $ putStrLn $ "=== Executando função:"
     --ic_io $ putStrLn $ pretty_sl f
 
@@ -302,8 +308,13 @@ ic_interpret_function f@(FuncDef fname rtype param gtypes body _) args = do
     ic_function_load_args args param fname
 
     -- running command list (function's return will be saved there.)
-    (_, value) <- ic_interpret_command_list body
+    (does_return, value) <- ic_interpret_command_list body
     --ic_io $ putStrLn $ "=== Terminou de executar a função "
+
+    final_value <- case (does_return, rtype) of
+        (True, _)           -> return value
+        (False, TypeVoid)   -> return ValueUnknown
+        (False, _)          -> ic_raise $ "Function `" ++ fname ++ "` ended without return."
 
     pm' <- ic_get_pm
     
@@ -311,7 +322,10 @@ ic_interpret_function f@(FuncDef fname rtype param gtypes body _) args = do
     ic_set_pm pm
     ic_set_gm gm
     
-    return $ (value, pm')
+    return $ (final_value, pm')
+
+ic_interpret_function _ _ = do
+    ic_raise $ "CHAMANDO ERRADO INTERPRETA FUNÇÃO" -- This should never happen
 
 
 -- checks the function's parameters and arguments and load the information into memory.
@@ -347,35 +361,39 @@ ic_function_load_args_rec (v:vs) ((VarDecl vname vtype):ps)
 
     -- just erroeing...
     | otherwise = ic_raise $ "Invalid argument type: " ++ show v ++ " / " ++ show vtype ++ show (length vs)
+
+ic_function_load_args_rec _ _ = ic_raise "Lenght mismatch in function load argumets" -- should never happen...
     
 
 -- Solves the generic types from the given value.
 solve_generics :: Value -> IR_Type -> InterpreterContext ()
 solve_generics v t@(TypeGeneric g) = do
-    gm <- ic_get_gm
+    --gm <- ic_get_gm
     overload_generic (to_type v) t
 
 
 -- assuming the arrays are always homogeneous, we look only to the first element.
-solve_generics (ValueArray (v:vs)) (TypeArray t _) = solve_generics v t
+solve_generics (ValueArray (v:_)) (TypeArray t _) = solve_generics v t
 
 -- oh god...
 solve_generics (ValueFunction fname) (TypeFunction ts tr) = do
     st <- ic_get_st
-    
+
     case Map.lookup fname st of
         Just (FuncDef _ rtype param [] _ _)    -> do
             overload_generic rtype tr
             overload_generic_list ts ((\(VarDecl _ t) -> t) <$> param)
 
-        _                           -> ic_raise $ "ARROMBADO"
+        _                           -> ic_raise $ "Function " ++ fname ++ "not defined."
 
+solve_generics _ _ = ic_raise "....."
 
 overload_generic_list :: [IR_Type] -> [IR_Type] -> InterpreterContext ()
 overload_generic_list [] [] = return $ ()
 overload_generic_list (a:as) (b:bs) = do 
     overload_generic a b
     overload_generic_list as bs
+overload_generic_list _ _ = ic_raise "Size mismatch for generics overload" -- should never happen
 
 
 overload_generic :: IR_Type -> IR_Type -> InterpreterContext ()
@@ -384,15 +402,14 @@ overload_generic vtype (TypeGeneric g) = do
     case Map.lookup g gm of
         -- genérico ainda não tá sobrecarregado.
         Nothing ->  do
-            
             ic_set_gm $ Map.insert g vtype gm
             return $ ()
         Just t  -> 
-            case tipo_compatível vtype (TypeGeneric g) of
+            case tipo_compatível vtype t of
                 True    -> return $ ()
                 False   -> ic_raise $ "Couldn't overload generic `" ++ g ++ "` (determined " ++ show t ++ ")" 
 overload_generic _ _ = return $ ()
-    
+
 
 -- só pra ver se o Value concorda com o IR_Type...
 é_tipo_válido :: Value -> IR_Type -> Bool
@@ -401,7 +418,7 @@ overload_generic _ _ = return $ ()
 é_tipo_válido (ValueString _) TypeString            = True
 é_tipo_válido (ValueBool _) TypeBool                = True
 é_tipo_válido (ValueArray b) (TypeArray t _)        = é_tipo_válido (b !! 0) t
-é_tipo_válido (ValueFunction n) (TypeFunction _ _)  = True
+é_tipo_válido (ValueFunction _) (TypeFunction _ _)  = True
 é_tipo_válido (ValueStruct sname1 _) (TypeStruct sname2) = sname1 == sname2
 é_tipo_válido _ _                                   = False
 
@@ -418,20 +435,20 @@ to_value TypeBool           = return $ ValueBool False
 to_value TypeInt            = return $ ValueInt 0
 to_value TypeFloat          = return $ ValueFloat 0.0
 to_value TypeString         = return $ ValueString "----EMPTY----"
-to_value (TypeArray base [exp]) = do
-    (value, _) <- ic_interpret_expression exp
-
+to_value (TypeArray base [_exp]) = do
+    (value, _) <- ic_interpret_expression _exp
     case value of
         ValueInt n  ->
             if n <= 0 then do
                 ic_raise $ "Invalid index: negative (" ++ show n ++ ")"
-                            
+
             else do
                 bolsa_de_valores <- mapM to_value (replicate (fromIntegral n) base)
                 return $ ValueArray $ bolsa_de_valores
-                
+
         _          -> ic_raise $ "Invalid index type: " ++ show value
-to_value (TypeArray _ _)    = error "NYI"
+
+to_value (TypeArray _ _)    = error $ "Multi-dimensional arrays: NYI"
 to_value (TypeGeneric g) = do
     gm <- ic_get_gm
     case Map.lookup g gm of
@@ -443,12 +460,14 @@ to_value (TypeStruct sname)    = do
     st <- ic_get_st
 
     case Map.lookup sname st of
-        Just (StructDef sname fields _)   -> do
-            value_list <- mapM (\(VarDecl _ field_type) -> to_value field_type) fields
-            return $ ValueStruct sname $ value_list
+        Just (StructDef _sname _fields _)   -> do
+            value_list <- mapM (\(VarDecl _ field_type) -> to_value field_type) _fields
+            return $ ValueStruct _sname $ value_list
         _                               -> do
             ic_raise $ "Struct " ++ show sname ++ " is unknown"
 
+to_value (TypeFunction _ _) = error $ "TYPE FUNCTION"
+to_value (NoType) = error $ "NoType on interpreter" -- should never happen
 
 
 ---------------------------
@@ -503,37 +522,37 @@ ic_interpret_command (LC (VarDef (VarDecl vname vtype) vexp) _) = do
             return $ (False, value)
 
 
-ic_interpret_command (LC (Return exp) _) = do
+ic_interpret_command (LC (Return _exp) _) = do
 
-    (lvalue, _) <- ic_interpret_expression exp
+    (lvalue, _) <- ic_interpret_expression _exp
 
     --ic_io $ putStrLn $ "=== Retorno: " ++ pretty_sl exp ++ "--->" ++ show lvalue
     return $ (True, lvalue)
 
 
-ic_interpret_command (LC (Assignment varaccess exp) _) = do
+ic_interpret_command (LC (Assignment varaccess _exp) _) = do
     -- for instance, for assignment, the reference doesn't matter.
     -- it may be important if pointers turn out to be a language's feature thought.
-    (lvalue, _) <- ic_interpret_expression exp
+    (lvalue, _) <- ic_interpret_expression _exp
     
     --ic_io $ putStrLn $ "=== Atribuindo " ++ pretty_sl exp ++ "(" ++ show lvalue ++ ") para " ++ pretty_sl varaccess
     non_return_command $ ic_pm_write varaccess lvalue
 
 
-ic_interpret_command (LC (If exp cmds1 cmds2) _) = do
+ic_interpret_command (LC (If _exp cmds1 cmds2) _) = do
     -- rvalue is irrelavant.
-    (lvalue, _) <- ic_interpret_expression exp
+    (lvalue, _) <- ic_interpret_expression _exp
 
     case lvalue of
-        ValueBool b -> do 
+        ValueBool b -> do
             -- simply: chooses between the list to be executed...
             ic_if b (ic_interpret_command_list cmds1) (ic_interpret_command_list cmds2)
         _ -> ic_raise $ "Non-boolean type on if command: " ++ show lvalue
 
 
-ic_interpret_command w@(LC (While exp cmds) _) = do
+ic_interpret_command w@(LC (While _exp cmds) _) = do
 
-    (lvalue, _) <- ic_interpret_expression exp
+    (lvalue, _) <- ic_interpret_expression _exp
     --ic_io $ putStrLn $ "=== Cabeça do While: " ++ show lvalue
 
     case lvalue of 
@@ -544,17 +563,18 @@ ic_interpret_command w@(LC (While exp cmds) _) = do
 
         _ -> ic_raise $ "Non-boolean type on While command: " ++ show lvalue
 
-ic_interpret_command for@(LC (For init_cmd exp it_exp cmds) _) = do
-    
+ic_interpret_command for@(LC (For init_cmd _exp it_exp cmds) _) = do
+    ic_raise $ "EU NÃO INTERPRETO FOR"
+
     -- saving state.
     pm <- ic_get_pm
 
     (_, _) <- case lc_cmd init_cmd of 
-        Assignment (VarAccess vname VarAccessNothing) exp   -> ic_interpret_command (LC (VarDef (VarDecl vname TypeVoid) exp) $ lc_pos init_cmd)
+        Assignment (VarAccess vname VarAccessNothing) _exp   -> ic_interpret_command (LC (VarDef (VarDecl vname TypeVoid) _exp) $ lc_pos init_cmd)
         _                                                   -> ic_interpret_command init_cmd
 
     -- once the initial command is executed, that is essentially a while with an extra command at the end.
-    (_, v) <- ic_interpret_command $ LC (While exp (cmds ++ [it_exp])) $ lc_pos init_cmd
+    (_, v) <- ic_interpret_command $ LC (While _exp (cmds ++ [it_exp])) $ lc_pos init_cmd
 
     -- erasing variables created inside the block.
     -- specially important for 'for', since usually init_cmd goes with variable def.
@@ -564,25 +584,26 @@ ic_interpret_command for@(LC (For init_cmd exp it_exp cmds) _) = do
     return $ (False, v)
 
         
-ic_interpret_command (LC (CmdExpression exp) _) = do
-    (lvalue, _) <- ic_interpret_expression exp
+ic_interpret_command (LC (CmdExpression _exp) _) = do
+    (lvalue, _) <- ic_interpret_expression _exp
     non_return_command $ (pure lvalue)
         
 
-ic_interpret_command (LC (Print exp) _) = do
-    (lvalue, rvalue) <- ic_interpret_expression exp
+ic_interpret_command (LC (Print _exp) _) = do
+    (lvalue, rvalue) <- ic_interpret_expression _exp
     
     case lvalue of
         ValueInt x      -> ic_print $ "INT: " ++ show x
         ValueFloat x    -> ic_print $ "FLOAT: " ++ show x
         ValueBool x     -> ic_print $ "BOOL: " ++ show x
-        ValueString x     -> ic_print $ "STRING: " ++ show x
+        ValueString x   -> ic_print $ "STRING: " ++ show x
         ValueUnknown    -> undefined
         _               -> undefined
 
     ic_pm_write (VarAccess "@rc" VarAccessNothing) (ValueInt 0)
     non_return_command $ (pure lvalue)
 
+ic_interpret_command (LC (Scan _exp) _) = ic_raise "scan NYI"
 
 ic_print :: String -> InterpreterContext ()
 ic_print string = 
@@ -611,6 +632,8 @@ ic_pm_read (VarAccess vname next_access) = do
             --ic_io $ putStrLn $ vname ++ " = " ++ show x'
             return $ x'
 
+ic_pm_read VarAccessNothing = ic_raise "ic_pm_read on VarAccessNothing" -- should never happen
+ic_pm_read (VarAccessIndex _ _) = ic_raise "ic_pm_read on VarAccessIndex" -- should never happen
 
 ic_pm_read2 :: IR_VarAccess -> Value -> InterpreterContext Value
 ic_pm_read2 VarAccessNothing acc = return $ acc
@@ -645,7 +668,7 @@ ic_pm_read2 (VarAccess vname next_access) acc = do
                     else ic_raise $ "ARRAY NÃO TEM ESSE CAMPO"
                 _                   -> ic_raise $ "ACESSO INVÁLIDO EM ARRAY..."
 
-        _                                   -> ic_raise $ "UÉ CARALHO O TREM NEM ESTRUTURA É"
+        _                           -> ic_raise $ "UÉ CARALHO O TREM NEM ESTRUTURA É"
 
 -- splitAt :: Int -> [a] -> ([a], [a])
 update_at :: Int -> a -> [a] -> [a]
@@ -659,7 +682,9 @@ ic_pm_write :: IR_VarAccess -> Value -> InterpreterContext Value
 ic_pm_write (VarAccess vname next_access) value = do
     pm <- ic_get_pm
     case Map.lookup vname pm of
-        Nothing -> ic_raise $ "Undef access to " ++ show vname
+        Nothing -> do
+            ic_print $ "UUUUUUAUUUUUUUUU"
+            ic_raise $ "Undef access to " ++ show vname
         Just x  -> do
             --ic_io $ putStrLn $ "SETTING " ++ show vname ++ "(" ++ show x ++ ") = " ++ show value
             
@@ -701,6 +726,7 @@ ic_pm_write2 (VarAccess vname next_access) acc valor = do
 
 
 ic_interpret_expression :: IR_Expression -> InterpreterContext (Value, Reference)
+ic_interpret_expression ExpNothing              = return $ (ValueUnknown, ReferênciaNão)
 ic_interpret_expression (ExpVariable varaccess@(VarAccess vname _)) = do
     
     -- actually access to variable can be access to symbols as well...
@@ -720,6 +746,10 @@ ic_interpret_expression (ExpVariable varaccess@(VarAccess vname _)) = do
     --ic_io $ putStrLn $ "=== ExpVariable: " ++ show lvalue ++ ", PM: " ++ show pm
 
     return $ (lvalue, Referência varaccess)
+
+ic_interpret_expression (ExpVariable (VarAccessIndex _ _)) = ic_raise "Invalid index access"
+
+ic_interpret_expression (ExpVariable VarAccessNothing) = return $ (ValueUnknown, ReferênciaNão) -- should never happen
     
 ic_interpret_expression (ExpLitInteger x)       = return $ (ValueInt x, ReferênciaNão)
 ic_interpret_expression (ExpLitFloating x)      = return $ (ValueFloat x, ReferênciaNão)
@@ -781,9 +811,9 @@ ic_interpret_expression (ExpRIncr e)             = do
 
             -- rincr return lvalue is the older one.
             return $ (v, r)
-    
 
-ic_interpret_expression ExpNothing              = return $ (ValueUnknown, ReferênciaNão)
+ic_interpret_expression (ExpLDecr e)             = do ic_raise "dd" -- Shouldn't happen?? Semantics should do Decr -> Incr?
+ic_interpret_expression (ExpRDecr e)             = do ic_raise "dd"
 
 
 ic_interpret_expression (ExpFCall fname params) = do
@@ -805,6 +835,8 @@ ic_interpret_expression (ExpFCall fname params) = do
                             (\(v, _) -> (v, ReferênciaNão)) <$> (ic_interpret_function function largs)
 
                 _                       -> ic_raise $ "Invalid function " ++ show fname -- fim da linha zz
+
+ic_interpret_expression (ExpFCall_Implicit fcall_exp params) = do ic_raise "ExpFCall_Implicit NYI"
 
 
 ic_interpret_expression (ExpStructInstance sname exps) = do
@@ -832,6 +864,9 @@ ic_interpret_expression (ExpArrayInstancing exps) = do
 ic_interpret_expression (ExpNew t) = do
     v <- to_value t
     return $ (v, ReferênciaNão)
+
+ic_interpret_expression (ExpLambda rtype params captures cmds) = do ic_raise "Lambda not yet implemented."
+ic_interpret_expression (ExpFunctionReference sname) = do ic_raise "Lambda not yet implemented."
     
 
 ic_interpret_binary_operation :: IR_Expression -> IR_Expression -> (Value -> Value -> Value) -> InterpreterContext (Value, Reference)
@@ -840,48 +875,3 @@ ic_interpret_binary_operation e1 e2 op  = do
     (v2, _) <- ic_interpret_expression e2
     return $ (v1 `op` v2, ReferênciaNão) 
 
-
-
--------------
--- TESTING --
--------------
-
--- @TODO create unit test to them...
-
-p1 = parse_sl "func SOMA(x: int, y: int) : int { return x + y; }\nfunc main(void) : void { let x : int = 1; let y : int = 2; let z : int = SOMA(x, y) ** 5; return; }"
-p2 = parse_sl "func main(argsc: int, argsv : string[]) : int { \n let x : int = 1; if (x > 5) { x = 10; } else { x = 11; }\n return x; }"
-p3 = parse_sl "func main() : int { let x : int = 7; let y : int = 3; let a : float = 2.5; let b : float = 2.0; let z : int = x / y; return z; }"
-p4 = parse_sl "func main(argsc: int, argsv : string[]) : int { \n let x : int = 1; while (x < 5) { ++ x; }\nreturn x ++; }"
-p5 = parse_sl "func asd(void) { }\nfunc asd(void) { }\nfunc main(argsc: int, argsv : string[]) : int { \n let x : int = 1; while (x < 5) { ++ x; }\nreturn x ++; }"
-p6 = parse_sl "struct A { } struct camarada { x: void; y: A; z1: A[1]; z2: A[][-1][5][\"ok\"]; }\nfunc asd(void) { return x + y; }"
-p7 = parse_sl "struct A { x: int[2][1 + 1]; }func SOMA(x: int, y: int) : int { return x + y; }\nfunc main(void) : int { let x : int = 1; let y : int = 2; let z : int = SOMA(x, y) ** 5; }"
-p8 = parse_sl "func tudo_certo(x : int, x: int) : int { let x = 1; let x : int = 2; let x : float = 3.0; return \"ok\"; }" -- problematic
-p9 = parse_sl "struct A { x: int[2][2]; } struct B { x: int; y : A; } func acesso_errado(void) { let x : int = 1; let y : float = x; }"
-
-pp1 = Data.Either.fromRight (Program []) p1
-pp2 = Data.Either.fromRight (Program []) p2
-pp3 = Data.Either.fromRight (Program []) p3
-pp4 = Data.Either.fromRight (Program []) p4
-pp5 = Data.Either.fromRight (Program []) p5
-pp6 = Data.Either.fromRight (Program []) p6
-pp7 = Data.Either.fromRight (Program []) p7
-pp8 = Data.Either.fromRight (Program []) p8
-pp9 = Data.Either.fromRight (Program []) p9
-
-r1 = interpret pp1
-r2 = interpret pp2
-r3 = interpret pp3
-r4 = interpret pp4
-r5 = interpret pp5
-
-
--- rapidão
-present_semantic (Left err)      = Left err
-present_semantic (Right (p, _))  = Right p
-
-s1 = putStrLn $ pretty_sl $ present_semantic $ sl_verify pp1
-s5 = putStrLn $ pretty_sl $ present_semantic $ sl_verify pp5
-s6 = putStrLn $ pretty_sl $ present_semantic $ sl_verify pp6
-s7 = putStrLn $ pretty_sl $ present_semantic $ sl_verify pp7
-s8 = putStrLn $ pretty_sl $ present_semantic $ sl_verify pp8
-s9 = putStrLn $ pretty_sl $ present_semantic $ sl_verify pp9

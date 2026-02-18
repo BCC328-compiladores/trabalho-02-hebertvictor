@@ -12,6 +12,7 @@ module Frontend.PrettyTree (pretty_sl_tree) where
 
 import Frontend.Pretty
 import Frontend.IR
+import Frontend.Error()
 
 
 
@@ -104,8 +105,11 @@ instance Pretty (PrettyTree IR_Statement) where
 instance Pretty (PrettyTree IR_LocatedCommand) where
     pretty :: (PrettyTree IR_LocatedCommand) -> PrettyContext ()
     pretty (PrettyTree (LC cmd pos)) = do
-        -- @todo
-        pretty cmd
+        pretty $ PrettyTree cmd
+        pc_newline
+        pc_tell $ "Pos = "
+        pretty pos
+        
 
 
 instance Pretty (PrettyTree IR_Command) where

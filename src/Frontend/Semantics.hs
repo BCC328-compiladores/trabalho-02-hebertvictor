@@ -14,6 +14,7 @@ module Frontend.Semantics ( sl_verify,
                             ) where
 
 import Frontend.IR
+import Frontend.Token
 import Frontend.Parser
 import Frontend.Error
 import Frontend.Value
