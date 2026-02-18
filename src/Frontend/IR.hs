@@ -63,12 +63,15 @@ data IR_Command =
     
     -- In constrast with the grammar, for the repetition it may be better have them separately.
     While IR_Expression [IR_LocatedCommand] |
-    For IR_LocatedCommand IR_Expression IR_Expression [IR_LocatedCommand] | -- @TODO For should be parsed into a while!
+    For IR_LocatedCommand IR_Expression IR_LocatedCommand [IR_LocatedCommand] |
 
     CmdExpression IR_Expression |
 
     Print IR_Expression |
-    Scan IR_Expression
+    Scan IR_Expression |
+
+    -- semantical analysis internal use...
+    CmdList [IR_LocatedCommand]
     
     deriving (Eq, Show, Read)
 
@@ -219,7 +222,7 @@ data IR_Expression =
 
     -- Lambda.
     ExpLambda IR_Type [IR_Var] [Identifier] [IR_LocatedCommand] |
-    ExpLiftedLambda Identifier
+    ExpFunctionReference Identifier
 
     deriving (Eq, Show, Read)
 
@@ -346,6 +349,7 @@ instance Pretty IR_Command where
                 pc_newline
 
     pretty (While cond cmds) = do
+        pc_newline
         pc_tell "while ("
         pretty cond
         pc_tell ") {"
@@ -361,6 +365,7 @@ instance Pretty IR_Command where
         pc_newline
 
     pretty (For ini cond incr cmds) = do
+        pc_newline
         pc_tell "for ("
         pretty ini
         pc_tell " "
@@ -507,6 +512,9 @@ instance Pretty IR_Expression where
     pretty (ExpLDecr expr) = (pc_tell "-- ") >> pretty expr
     pretty (ExpRIncr expr) = (pretty expr) >> pc_tell " ++"
     pretty (ExpRDecr expr) = (pretty expr) >> pc_tell " --"
+
+    pretty (ExpFunctionReference fname) = do
+        pretty fname
 
 
 instance Pretty IR_VarAccess where

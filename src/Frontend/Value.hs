@@ -139,5 +139,6 @@ constant_eval ExpNothing            = Nothing
 constant_eval (ExpNegative e)       = (||!||) <$> constant_eval e
 constant_eval (ExpLitInteger x)     = Just $ ValueInt x
 constant_eval (ExpLitString x)      = Just $ ValueString x
+constant_eval (ExpLitBoolean b)     = Just $ ValueBool b
 constant_eval (ExpSum e1 e2)        = (||+||) <$> constant_eval e1 <*> constant_eval e2
 constant_eval _                     = Nothing

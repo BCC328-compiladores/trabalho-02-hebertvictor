@@ -554,7 +554,7 @@ ic_interpret_command for@(LC (For init_cmd exp it_exp cmds) _) = do
         _                                                   -> ic_interpret_command init_cmd
 
     -- once the initial command is executed, that is essentially a while with an extra command at the end.
-    (_, v) <- ic_interpret_command $ LC (While exp (cmds ++ [LC (CmdExpression it_exp) $ lc_pos init_cmd])) $ lc_pos init_cmd
+    (_, v) <- ic_interpret_command $ LC (While exp (cmds ++ [it_exp])) $ lc_pos init_cmd
 
     -- erasing variables created inside the block.
     -- specially important for 'for', since usually init_cmd goes with variable def.

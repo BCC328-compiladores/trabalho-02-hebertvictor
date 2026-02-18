@@ -20,7 +20,7 @@ import Frontend.Value
 import Frontend.Pretty
 
 import Data.Map ( Map )
-import Data.List ( elemIndex )
+import Data.List ( elemIndex, nub )
 import Data.Either
 import Data.Maybe ( isNothing, fromJust )
 import qualified Data.Map as Map
@@ -118,22 +118,71 @@ data VariableInfo = VariableInfo { -- state
 
     -- ID reference.
     -- As of now, used for lambda lifting...
-    varstat_ref         :: Identifier 
+    varstat_ref         :: Identifier,
+
+    varstat_level       :: Int
 } deriving (Eq, Show)
 
 varstat_to_vardecl :: VariableInfo -> IR_Var
-varstat_to_vardecl (VariableInfo vname vtype _ _ _) = VarDecl vname vtype
+varstat_to_vardecl (VariableInfo vname vtype _ _ _ _) = VarDecl vname vtype
+
 
 type GenericsMap = Map Identifier IR_Type
 type VariableMap = Map Identifier VariableInfo
 
 
-default_fc = FC null_function False 0
+variable_to_access :: [Identifier] -> [IR_VarAccess]
+variable_to_access vars = ((\s -> VarAccess s VarAccessNothing) <$> vars)
+
+
+descent_vm :: VariableMap -> VariableMap -> VariableMap
+descent_vm base_vm other_vm = __descent (Map.toList other_vm) base_vm
+  where
+    __descent [] acc = acc
+
+    __descent ((vname, vinfo_other):xs) acc =
+        case Map.lookup vname acc of
+            Nothing ->
+                __descent xs acc
+            
+            Just (VariableInfo _ vtype use_base def_pos vref level_base) ->
+                case vinfo_other of
+                    VariableInfo _ _ use_other _ _ level_other ->
+                        if level_other >= level_base then
+                            __descent xs m
+
+                        else do
+                            __descent xs acc
+
+                        where 
+                            m = Map.insert vname (VariableInfo vname vtype novo_contador def_pos vref level_base) acc
+                            novo_contador
+                                | level_other > level_base  = use_other + use_base
+                                | level_other == level_base = use_other
+
+fc_next_level :: SemanticalContext ()
+fc_next_level = do
+    fc <- sc_get_fc
+
+    let cl = fc_context_level fc
+    sc_set_fc $ fc { fc_context_level = cl + 1 }
+
+fc_previous_level :: SemanticalContext ()
+fc_previous_level = do
+    fc <- sc_get_fc
+
+    let cl = fc_context_level fc
+    sc_set_fc $ fc { fc_context_level = cl - 1 }
+
+
+default_fc = FC null_function False 0 0
 
 data FunctionContext = FC {
     fc_statement    :: IR_Statement,
     fc_has_return   :: Bool, -- TRACKS IF THE FUNCTION HAS A RETURN AT THE END!
-    fc_lambda_count :: Int
+    
+    fc_lambda_count :: Int, -- NOT SUPPOSED TO BE HERE, BUT ANYWAYS...
+    fc_context_level :: Int
 } deriving (Eq, Show)
 
 
@@ -168,7 +217,7 @@ instance Applicative SemanticalContext where
     (SC transition_f) <*> (SC transition_x) = SC $ \state -> 
         -- evaluating the function;
         let (value_f, state_f, errors_f) = transition_f state
-            
+        
         -- evaluating the value;
             (value_x, state_x, errors_x) = transition_x state_f
 
@@ -258,7 +307,17 @@ sl_verify p = do -- from either
 verify_program :: IR_Program -> SemanticalContext IR_Program
 verify_program p@(Program statements) = do
     statements' <- mapM verify_statement statements
-    return $ Program statements'
+
+    -- extending the lambdas statements.
+    st <- sc_get_st
+
+    let lambdas = filter is_lambda (snd <$> Map.toList st) where
+        is_lambda stmt = case stmt of       
+            FuncDef sname _ _ _ _ _     -> length sname > 7 && (take 7 sname == "@LAMBDA") -- "@LAMBDA"
+            StructDef _ _ _             -> False
+    
+    let statements'' = lambdas ++ statements'
+    return $ Program statements''
 
 
 verify_statement :: IR_Statement -> SemanticalContext IR_Statement
@@ -300,14 +359,16 @@ verify_function f@(FuncDef sname rtype param gtypes body pos) context_vm = do
     sc_set_pos pos
     
     fc <- sc_get_fc
-    sc_set_fc $ FC f False (fc_lambda_count fc)
+    sc_set_fc $ FC f False (fc_lambda_count fc) (fc_context_level fc)
+    fc_next_level
 
     mapM_ (\g -> load_generic g TypeVoid) gtypes -- loading generics.
     mapM_ load_variable param -- loading the variables into memory.
 
     -- verifying each command individually...
     commands' <- mapM verify_command body
-    
+    let commands'' = expand_command_list commands'
+
     -- checking for end-of-function state.
     verified_rtype <- verify_type rtype
     verify_function_final_state 
@@ -316,10 +377,14 @@ verify_function f@(FuncDef sname rtype param gtypes body pos) context_vm = do
     sc_set_gm gm
     sc_set_vm vm
 
-    fc <- sc_get_fc
-    sc_set_fc $ FC null_function False (fc_lambda_count fc)
+    sc_set_fc $ fc
+    fc_previous_level
 
-    return $ FuncDef sname verified_rtype param gtypes commands' pos
+    let new_function = FuncDef sname verified_rtype param gtypes commands'' pos
+    st <- sc_get_st
+    sc_set_st $ st_insert new_function st
+
+    return $ new_function
 
 
 verify_function_final_state :: SemanticalContext ()
@@ -344,21 +409,30 @@ verify_function_final_state = do
             else do
                 sc_raise $ "Function " ++ show sname ++ " have no explicit return but expects " ++ pretty_sl rtype
 
+    _ <- verify_closure_final_state
+    return $ ()
+    -- @TODO: what more?
+
+
+verify_closure_final_state :: SemanticalContext ()
+verify_closure_final_state = do
     vm <- sc_get_vm
 
     -- at the end of the function, every variable should be used.
     Map.foldrWithKey verify_if_variable_is_accessed (return ()) vm
     where 
-        verify_if_variable_is_accessed _ (VariableInfo vname vtype access_count def_pos vref) _ = do
+        verify_if_variable_is_accessed _ (VariableInfo vname vtype access_count def_pos vref level) acc = do
+            _ <- acc
             sc_set_pos def_pos
-            if access_count <= 0 then do
-                fc <- sc_get_fc
+            
+            fc <- sc_get_fc
+            
+            if access_count < 1 && level == fc_context_level fc then do
                 let sname   = (symbol_name . fc_statement) fc
 
-                sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype ++") is not being used on function " ++ show sname
-            else return $ ()
+                sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype ++") is not being used on function " ++ show sname -- ++ " [" ++ show level ++ ", " ++ (show $ fc_context_level fc) ++ "]"
 
-    -- @TODO: what more?
+            else return $ ()
 
 
 ------------------------
@@ -370,10 +444,21 @@ set_vref vname vref = do
 
     vm <- sc_get_vm
     case Map.lookup vname vm of
-        Just (VariableInfo _ vtype use_count def_pos _) ->
-            sc_set_vm $ Map.insert vname (VariableInfo vname vtype use_count def_pos vref) vm
+        Just (VariableInfo _ vtype use_count def_pos _ level) ->
+            sc_set_vm $ Map.insert vname (VariableInfo vname vtype use_count def_pos vref level) vm
 
         _ -> return $ ()
+
+
+-- recursive descent expanding what is (eliminating) `CmdList`.
+expand_command_list :: [IR_LocatedCommand] -> [IR_LocatedCommand]
+expand_command_list commands = __expand_command_list commands [] where
+    __expand_command_list [] acc                                            = acc
+    __expand_command_list ((LC (CmdList cmds) _) : xs) acc                  = __expand_command_list xs (acc ++ cmds)
+    __expand_command_list ((LC (If exp cmds1 cmds2) pos) : xs) acc          = __expand_command_list xs (acc ++ [LC (If exp (expand_command_list cmds1) (expand_command_list cmds2)) pos])
+    __expand_command_list ((LC (While exp cmds) pos) : xs) acc              = __expand_command_list xs (acc ++ [LC (While exp (expand_command_list cmds)) pos])
+    __expand_command_list ((LC (For cmd1 exp2 exp3 cmds) pos) : xs) acc     = __expand_command_list xs (acc ++ [LC (For cmd1 exp2 exp3 (expand_command_list cmds)) pos])
+    __expand_command_list (x:xs) acc                                        = __expand_command_list xs (acc ++ [x])
 
 
 verify_command :: IR_LocatedCommand -> SemanticalContext IR_LocatedCommand
@@ -391,7 +476,7 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
         return $ ()
 
     else do
-
+        
         -- @TODO NYI, and the verification can improve a bit.
         -- But the idea being: if the expression is of concrete type and 
         -- and the type is generic, then the generic can be solved...
@@ -420,7 +505,7 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
 
     -- POR ENQUANTO TÁ BOM.
     case exp' of
-        ExpLiftedLambda sname -> do
+        ExpFunctionReference sname -> do
             set_vref vname sname
 
         _ -> return $ ()
@@ -452,7 +537,7 @@ verify_command (LC (Return exp) pos) = do
     verified_rtype <- verify_type rtype
     
     (exp', possible_type) <- verify_expression exp
-    
+
     -- @TODO verify if in a complex command (control-flux / repetition)!
     if function_rtype_match verified_rtype possible_type then do
         return $ () -- OK
@@ -461,33 +546,104 @@ verify_command (LC (Return exp) pos) = do
 
     -- has return.
     fc <- sc_get_fc
-    sc_set_fc $ FC (fc_statement fc) True (fc_lambda_count fc)
+    sc_set_fc $ FC (fc_statement fc) True (fc_lambda_count fc) (fc_context_level fc)
 
     -- @TODO check current rtype.
     return $ LC (Return exp') pos
 
-verify_command (LC (If exp cmds1 cmds2) pos) = do
+verify_command cmd@(LC (If exp cmds1 cmds2) pos) = do
     sc_set_pos pos
-
+    
     -- @TODO what to verify on control-flux?
-    (exp', _) <- verify_expression exp
-    cmds1' <- mapM verify_command cmds1 
-    cmds2' <- mapM verify_command cmds2
-    return $ LC (If exp' cmds1' cmds2') pos
+    (exp', exp_type) <- verify_expression exp
 
-verify_command (LC (While exp cmds) pos) = do
+    vm <- sc_get_vm
+    fc_next_level
+
+    cmds1' <- mapM verify_command cmds1
+    verify_closure_final_state
+    vm' <- sc_get_vm
+    sc_set_vm $ descent_vm vm vm'
+
+    cmds2' <- mapM verify_command cmds2
+    verify_closure_final_state
+    vm' <- sc_get_vm
+    sc_set_vm $ descent_vm vm vm'
+
+    fc_previous_level
+
+    -- command-flux expression must be a boolean.
+    if exp_type /= TypeBool then do
+        sc_raise $ "Non-boolean evaluated expression in control-flux: " ++ pretty_sl exp_type
+        return $ cmd
+
+    else do
+        
+        case constant_eval exp' of
+            Just (ValueBool True)   -> do
+                let cmds1'' = expand_command_list cmds1'
+                return $ LC (CmdList cmds1'') pos
+
+            Just (ValueBool False)  -> do
+                let cmds2'' = expand_command_list cmds2'
+                return $ LC (CmdList cmds2'') pos
+
+            _                       -> do
+                -- no reduction possible.
+                let cmds1'' = expand_command_list cmds1'
+                let cmds2'' = expand_command_list cmds2'
+                return $ LC (If exp' cmds1'' cmds2'') pos
+
+verify_command cmd@(LC (While exp cmds) pos) = do
     sc_set_pos pos
 
-    -- @TODO
-    (exp', _) <- verify_expression exp
-    cmds' <- mapM verify_command cmds
-    return $ LC (While exp' cmds') pos
+    vm <- sc_get_vm
+
+    (exp', exp_type) <- verify_expression exp
+
+    fc_next_level
+    
+    cmds' <- mapM verify_command cmds 
+    let cmds'' = expand_command_list cmds'
+
+    vm' <- sc_get_vm
+    sc_set_vm $ descent_vm vm vm'
+
+    fc_previous_level
+
+    -- command-flux expression must be a boolean.
+    if exp_type /= TypeBool then do
+        sc_raise $ "Non-boolean evaluated expression in while: " ++ pretty_sl exp_type
+        return $ cmd
+
+    else do
+        case constant_eval exp' of
+            Just (ValueBool False)  -> do
+                return $ LC (CmdList cmds'') pos
+
+            _                       -> do
+                -- no reduction possible.
+                return $ LC (While exp' cmds'') pos
 
 verify_command (LC for@(For init_cmd exp it_cmd cmds) pos) = do
     sc_set_pos pos
+    
+    let extended_cmds = cmds ++ [it_cmd]
+    
+    case init_cmd of
+        LC (CmdExpression ExpNothing) _ -> do
+            -- in that case, there's no need adding an extra "nothing" command, isn't it?
+            verify_command $ LC (While exp extended_cmds) pos
 
-    -- @TODO
-    return $ LC for pos
+        x -> do
+            y <- verify_command $ LC (CmdList [
+                x,
+                LC (While exp extended_cmds) pos
+                ]) pos 
+            
+            case y of
+                LC (CmdList cmds') pos -> 
+                    return $ LC (CmdList (expand_command_list cmds')) pos
 
 verify_command (LC (CmdExpression exp) pos) = do
     sc_set_pos pos
@@ -510,6 +666,11 @@ verify_command (LC (Scan exp) pos) = do
     (exp', _) <- verify_expression exp
     return $ LC (Scan exp') pos
 
+verify_command (LC (CmdList cmds) pos) = do
+    cmds' <- mapM verify_command cmds
+    return $ LC (CmdList cmds') pos
+
+
 
 
 ----------------------------------------
@@ -522,7 +683,7 @@ set_captures sname captures = do
 
     case Map.lookup sname cmap of
         Just captures' -> 
-            sc_set_cmap $ Map.insert sname (captures' ++ captures) cmap
+            sc_set_cmap $ Map.insert sname (nub $ captures' ++ captures) cmap
 
         _ -> 
             sc_set_cmap $ Map.insert sname captures cmap
@@ -540,32 +701,46 @@ load_variable (VarDecl vname vtype) = do
     
     vm <- sc_get_vm
     pos <- sc_get_pos
-    
+    fc <- sc_get_fc
+
     -- checking for shadowing...
     case Map.lookup vname vm of 
         Nothing -> do
-            -- OK
-            sc_set_vm (Map.insert vname (VariableInfo vname vtype 0 pos "undefined") vm)
-        
-        Just (VariableInfo _ t _ def_pos vref) -> do
+            -- OK.
+            sc_set_vm (Map.insert vname (VariableInfo vname vtype 0 pos "undefined" (fc_context_level fc)) vm)
 
-            fc <- sc_get_fc
+        Just (VariableInfo _ t _ def_pos vref level) -> do
             cmap <- sc_get_cmap
 
-            u <- case Map.lookup (symbol_name $ fc_statement fc) cmap of
-                Just xs     -> return $ any (== vname) xs
-                _           -> return $ False
+            if level < fc_context_level fc then do
+                -- OK.
+                sc_set_vm (Map.insert vname (VariableInfo vname vtype 0 pos "undefined" (fc_context_level fc)) vm)
+                
+            else do
+                u <- case Map.lookup (symbol_name $ fc_statement fc) cmap of
+                    Just xs     -> return $ any (== vname) xs
+                    _           -> return $ False
 
-            if u then do
-                return $ ()
-            else
-                sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl t ++ "), first defined at " ++ pretty_sl def_pos ++ ", is redefined with type " ++ pretty_sl vtype
+                if u then do
+                    return $ ()
+
+                else
+                    sc_raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl t ++ "), first defined at " ++ pretty_sl def_pos ++ ", is redefined with type " ++ pretty_sl vtype
 
 
 function_type :: IR_Statement -> IR_Type
 function_type (FuncDef _ rtype parameters _ _ _) = TypeFunction param_types rtype where
     param_types = (\(VarDecl _ t ) -> t) <$> parameters
 function_type _ = NoType
+
+
+variable_type :: Identifier -> SemanticalContext IR_Type
+variable_type vname = do
+
+    vm <- sc_get_vm
+    case Map.lookup vname vm of
+        Nothing                             -> return NoType
+        Just (VariableInfo _ vtype _ _ _ _) -> return vtype
 
 
 -- Structurally similar to `ic_pm_read`.
@@ -589,11 +764,11 @@ verify_access access@(VarAccess vname next_access) = do
                     sc_raise $ "Variable " ++ show vname ++ " is not defined"
                     return $ (access, NoType)
 
-        Just (VariableInfo _ vtype access_count def_pos vref)  -> do
+        Just (VariableInfo _ vtype access_count def_pos vref level)  -> do
             -- is defined!
             
             -- variable is accessed one more time!
-            sc_set_vm $ Map.insert vname (VariableInfo vname vtype (access_count + 1) def_pos vref) vm
+            sc_set_vm $ Map.insert vname (VariableInfo vname vtype (access_count + 1) def_pos vref level) vm
 
             (va, vt) <- __access_type vname next_access vtype
             return $ (access, vt)
@@ -837,22 +1012,26 @@ verify_expression exp@(ExpFCall sname args) = do
             -- then it is probably a local function.
             vm <- sc_get_vm
             case Map.lookup sname vm of
-                Just (VariableInfo _ (TypeFunction param_types rtype) _ _ vref) -> do
+                Just (VariableInfo _ (TypeFunction param_types rtype) _ _ vref vlevel) -> do
                     
                     -- creating dummy access...
                     verify_access (VarAccess sname VarAccessNothing)
 
                     rtype' <- verify_type rtype
-                    verify_fcall sname types' param_types rtype'
 
                     cmap <- sc_get_cmap
                     case Map.lookup vref cmap of
                         Just captures -> do
-                            let scoped_args = (\s -> ExpVariable (VarAccess sname VarAccessNothing)) <$> captures
+                            capture_types <- mapM variable_type captures 
+                            --sc_raise $ show (types' ++ capture_types) ++ " / " ++ show param_types ++ show "; args: " ++ pretty_sl args' ++ show "; types: " ++ pretty_sl types' ++ "; captures: " ++ pretty_sl captures
+                            verify_fcall sname (types' ++ capture_types) param_types rtype'
+
+                            let scoped_args = (\s -> ExpVariable (VarAccess s VarAccessNothing)) <$> captures
                             let exp' = ExpFCall sname (args' ++ scoped_args)
                             return $ (exp', rtype')
 
                         _ -> do
+                            verify_fcall sname types' param_types rtype'
                             return $ (exp, rtype')
 
                 y   -> do
@@ -974,7 +1153,7 @@ verify_expression exp@(ExpFCall_Implicit fcall_exp args) = do
             sc_raise $ "Instant evaluation of non-lambda expression: " ++ pretty_sl exp
             return $ (exp, NoType)
 
-verify_expression exp@(ExpLambda rtype vars _ _) = do
+verify_expression exp@(ExpLambda rtype vars captures _) = do
     -- lifting lambda...
     -- at that step, function verification is performed...
     sname <- lift_lambda exp
@@ -991,15 +1170,18 @@ verify_expression exp@(ExpLambda rtype vars _ _) = do
         -- taking the types of the parameters...
         var_types <- mapM verify_type ((\(VarDecl _ t) -> t) <$> vars)
         
+        capture_accesses <- mapM verify_access $ variable_to_access captures
+        let capture_types = snd <$> capture_accesses
+
         if any is_type_invalid var_types then do
             sc_raise $ "Invalid parameter type on lambda function..."
             return $ (exp, NoType)
 
         else do
             -- 
-            return $ (ExpLiftedLambda sname, TypeFunction var_types rtype')
+            return $ (ExpFunctionReference sname, TypeFunction (var_types ++ capture_types) rtype')
 
-verify_expression exp@(ExpLiftedLambda sname) = do
+verify_expression exp@(ExpFunctionReference sname) = do
     st <- sc_get_st
     case Map.lookup sname st of
         Just (FuncDef _ rtype _ _ _ _) -> return $ (exp, rtype)
@@ -1109,7 +1291,7 @@ lift_lambda lambda@(ExpLambda rtype vars captures cmds) = do
     let sname = "@LAMBDA-" ++ show lambda_id
 
     -- vira mais um.
-    sc_set_fc $ FC (fc_statement fc) (fc_has_return fc) (lambda_id + 1)
+    sc_set_fc $ FC (fc_statement fc) (fc_has_return fc) (lambda_id + 1) (fc_context_level fc)
 
     st <- sc_get_st
     pos <- sc_get_pos
@@ -1120,16 +1302,18 @@ lift_lambda lambda@(ExpLambda rtype vars captures cmds) = do
 
     set_captures sname captures
 
-    statement <- verify_function (FuncDef {
+    let statement = FuncDef {
         symbol_name = sname,
         function_rtype = rtype,
         function_parameters = extended_vars,
         function_gtypes = [],
         function_body = cmds,
         symbol_pos = pos
-    }) captured
-    
+    }
+
     sc_set_st $ st_insert statement st
+    statement' <- verify_function statement captured
+    sc_set_st $ st_insert statement' st
 
     --sc_raise $ ">>> LIFTED " ++ show sname 
     return $ sname

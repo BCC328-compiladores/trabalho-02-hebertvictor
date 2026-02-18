@@ -232,7 +232,7 @@ Command :
     -- @NOTES: 
     -- 1 - semicolon is already included in the command...
     -- 2 - `command` in the for is too generic.
-    FOR '(' ForInitCommand ';' OptionalExpression ';' OptionalExpression ')' '{' CommandList '}'  
+    FOR '(' ForInitCommand ';' OptionalExpression ';' ForItCommand ')' '{' CommandList '}'  
                                                                         { LC (For $3 $5 $7 $10)     $1 } |
 
     -- Others
@@ -250,9 +250,13 @@ Elses :
 ForInitCommand :: { IR_LocatedCommand }
 ForInitCommand :
     VariableAccess '=' Expression           { LC (Assignment $1 $3) $2 } | -- pos on equal.
-    VariableDecl '=' Expression             { LC (VarDef $1 $3)     $2}  |
+    LET VariableDecl '=' Expression         { LC (VarDef $2 $4)     $3 }  |
     OptionalExpression                      { LC (CmdExpression $1) (SrcPos (0, 0)) } -- @TODO
 
+ForItCommand :: { IR_LocatedCommand }
+ForItCommand :
+    VariableAccess '=' Expression           { LC (Assignment $1 $3) $2 } | -- pos on equal.
+    OptionalExpression                      { LC (CmdExpression $1) (SrcPos (0, 0)) } -- @TODO
 
 
 -----------------

@@ -75,7 +75,8 @@ type_error_specs = describe "Type violations" $ do
     it "No-explicit return (ep3.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep3.sl" $ sem [
             ("Function \"doidera\" have no explicit return but expects float",              (7, 6)),
-            ("Function \"main\" have no explicit return but expects int",                   (13, 6))
+            ("Function \"main\" have no explicit return but expects int",                   (13, 6)),
+            ("Variable \"z\" (int) is not being used on function \"main\"",                 (16, 34))
             ]
     
     it "Unexpected return type (ep4.sl)" $ do
@@ -104,8 +105,18 @@ type_error_specs = describe "Type violations" $ do
             ("Variable \"z3\" (int[]) is set to an expression that evaluates to float[3]",          (48, 38)),
             ("Invalid array instancing: new int[]",                                                 (50, 32)),
             ("Allocating non-array type int is meaningless",                                        (51, 30)),
+
+            ("Variable \"z5\" (int[]) is not being used on function \"arrays\"",                    (51, 30)),
+            ("Variable \"z4\" (int[]) is not being used on function \"arrays\"",                    (50, 32)),
+            ("Variable \"z3\" (int[]) is not being used on function \"arrays\"",                    (48, 38)),
+            ("Variable \"z2\" (int[]) is not being used on function \"arrays\"",                    (47, 41)),
+            ("Variable \"z\" (int[]) is not being used on function \"arrays\"",                     (46, 25)),
+            ("Variable \"y\" (int[]) is not being used on function \"arrays\"",                     (43, 30)),
+            ("Variable \"x\" (int[]) is not being used on function \"arrays\"",                     (42, 35)),
             ("Variable \"w\" (int[4]) is not being used on function \"arrays\"",                    (41, 34)),
+
             ("Calling struct \"Aluno\" (defined at (7, 8)) as a function!",                         (60, 22)),
+            ("Variable \"b\" (Aluno) is not being used on function \"structs\"",                    (58, 25)),
             ("Variable \"a\" (Aluno) is not being used on function \"structs\"",                    (57, 31)),
             ("Function \"function_not_defined\" is undefined",                                      (67, 34)),
             ("Calling function \"SOMA\" with wrong number of arguments (3 out of 2)",               (70, 49)),
@@ -153,10 +164,10 @@ lambda_specs = describe "Lambda" $ do
     it "Errors #1 (ep9.sl)" $ do
         verify_src_and_compare "data/sl/sa/ep9.sl" $ sem [
             ("Calling function \"lambda\" with wrong number of arguments (3 out of 1)",     (45, 6)),
-            ("Calling function \"f\" with wrong number of arguments (0 out of 3)",          (49, 15)),
-            ("Calling function \"f\" with wrong number of arguments (1 out of 3)",          (50, 16)),
-            ("Calling function \"f\" with wrong number of arguments (2 out of 3)",          (51, 19)),
-            ("Calling function \"f\" with wrong number of arguments (4 out of 3)",          (52, 30)),
+            ("Calling function \"f\" with wrong number of arguments (3 out of 6)",          (49, 15)),
+            ("Calling function \"f\" with wrong number of arguments (4 out of 6)",          (50, 16)),
+            ("Calling function \"f\" with wrong number of arguments (5 out of 6)",          (51, 19)),
+            ("Calling function \"f\" with wrong number of arguments (7 out of 6)",          (52, 30)),
             ("Invalid argument #1 on function \"f\" call: expected int, yet, argument is float",          (55, 35))
             ]
 
@@ -182,7 +193,7 @@ global_specs = describe "General program structure" $ do
         -- @TODO
         1 `shouldBe` 1
 
-    it "ASD (ex7.sl)" $ do
+    it "Data-structure example (ex7.sl)" $ do
         verified <- verify_src "data/sl/ex7.sl"
-        putStrLn $ show verified
+        putStrLn $ pretty_sl verified
         1 `shouldBe` 1
