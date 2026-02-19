@@ -87,6 +87,7 @@ executable HarmonicalVortex
                     time >=1.12,
                     array >= 0,
                     directory,
+                    process,
                     HarmonicalVortex
 
     build-tool-depends:
