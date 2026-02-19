@@ -1,26 +1,48 @@
 {-  -------------------------------------
-    @file       src/Backend/WASM/Codegen.hs
-    @details    ~
+    @file       src/Backend/WASM/WAT_Codegen.hs
+    @details    Compiles the IR into a WAT IR that can nextly be converted into WAT via pretty...
 -}
 
+module Backend.WASM.WAT_Codegen where
+
+import Frontend.Pretty
+import Frontend.IR
+import Frontend.Error
+
+
 import qualified Data.Map as Map
-import control
 
 
 ---------
 -- API --
 ---------
 
-compile_program :: IR_Program -> WASM_Code
-compile_program (Program stmts) = map 
-
-convert_code :: WASM_Code -> String
-convert_code wcode = 
 
 
 --------------
 -- WASM IR ---
 --------------
+
+-- OBS: SL identifiers are a subset of the WAT identifiers, s.t. we'll not going to get in
+-- trouble with direct conversion...
+to_wat_identifier :: Identifier -> Identifier
+to_wat_identifier = id
+
+
+-- The WASM code resepresentaion as a data structure.
+data WASM_Code = WASM_Code [WASM_Function]
+
+
+data WASM_Function = 
+    WF { 
+        wf_name     :: String, 
+        wf_params   :: [WASM_Type], 
+        wf_result   :: Maybe WASM_Type, 
+        wf_locals   :: [WASM_Type],  -- @TODO WTF N ENTENDI NADA
+        wf_body     :: [WASM_Instruction]
+    }
+    deriving (Eq, Show)
+
 
 data WASM_Type =
     I32 |
@@ -29,47 +51,43 @@ data WASM_Type =
     F64 
     deriving (Eq, Show)
 
-ir_type_to_wasm :: IR_Type -> Maybe WASM_Type
-ir_type_to_wasm TypeInt   = Just I32
-ir_type_to_wasm TypeBool  = Just I32
-ir_type_to_wasm TypeFloat = Just F32
-ir_type_to_wasm TypeVoid  = Nothing     -- Nothing will mean no type
-ir_type_to_wasm _         = error "Unsupported..."
+
+to_wasm_type :: IR_Type -> Maybe WASM_Type
+to_wasm_type TypeInt   = Just I32
+to_wasm_type TypeBool  = Just I32
+to_wasm_type TypeFloat = Just F32
+to_wasm_type TypeVoid  = Nothing     -- Nothing will mean no type
+to_wasm_type _         = error "Unsupported..."
+
 
 data WASM_Instruction = 
-    I32Const Int |
+    I32Const    Int |
     I32Add |
     I32Sub |
     I32Mul |
     I32Div | 
     
-    LocalGet Int |
-    LocalSet Int |
+    LocalGet    Identifier |
+    LocalSet    Identifier |
     
-    Call String | 
+    Call        Identifier |
     Return | 
     
-    If (Maybe WASM_Type) [WASM_Instruction] [WASM_Instruction] |
-    Block [WASM_Instruction] | 
-    Loop [WASM_Instruction] | 
-    Br Int | 
-    BrIf Int | 
+    If          (Maybe WASM_Type) [WASM_Instruction] [WASM_Instruction] |
+    Block       Identifier [WASM_Instruction] | 
+    Loop        Identifier [WASM_Instruction] | 
+    Br          Identifier |
+    BrIf        Identifier |
     
     Drop
   deriving (Eq, Show)
 
-data WASM_Function = 
-    WF { 
-        wasm_fname    :: String, 
-        wasm_fparams  :: [WASM_Type], 
-        wasm_fresult  :: Maybe WASM_Type, 
-        wasm_flocals  :: [WASM_Type], 
-        wasm_fbody    :: [WASM_Instruction]
-    }
-    deriving (Eq, Show)
 
--- The WASM code resepresentaion as a data strucutre
-data WASM_Code = [WASM_Function]
+{-
+
+translate_program :: IR_Program -> WASM_Code
+translate_program (Program stmts) = translate_statements stmts
+
 
 data LocalsMap = Map Identifier Int
 
@@ -161,8 +179,12 @@ sc_set_label_depth ld = CC $ \(CodegenState l lt nl insts _) -> ((), CodegenStat
 
 
 
-sc_empty_cgstate :: [IR_Var] -> CodegenState
-sc_empty_cgstate vars = 
+get_var_wasm_type :: IR_Var -> WASM_Type
+get_var_wasm_type (VarDecl _ t) = to_wasm_type t
+
+sc_initial_cgstate :: [IR_Var] -> CodegenState
+sc_initial_cgstate vars =
+    CodegenState Map.empty (map $ get_var_wasm_type vars) 0 [] 0
 
 
 
@@ -170,37 +192,7 @@ sc_empty_cgstate vars =
 -- Code Generation --
 ---------------------
 
-compile_statement :: IR_Statement -> WASM_Function
-compile_statement (FuncDef fname rtype params _ body _) = do
-    let initialState = sc_empty_cgstate $ params
-        ((), finalState) = codegen_context_run (compile_function_body body) initialState
-    in buildWasmFunction name rtype params finalState
-
--- Verifies the program; in case of success, returns the verified program.
-sl_verify :: IR_Program -> Either Error (IR_Program, SymbolTable)
-sl_verify p = do -- from either
-
-    -- creating the symbol table.
-    st <- sl_create_st p
-
-    let (r, final_state, errs) = semantical_analysis_context_run (verify_program p) (SemanticalState st Map.empty Map.empty default_fc Map.empty (SrcPos (-1, -1)))
-
-    case errs of
-        []  -> Right $ (r, ss_st final_state)
-        _   -> Left $ MultipleErrors errs
-
-
-verify_program :: IR_Program -> SemanticalContext IR_Program
-verify_program p@(Program statements) = do
-    statements' <- mapM verify_statement statements
-    return $ Program statements'
-
-
-genExpr :: Expr -> VarEnv -> String
-genExpr (Lit n) _ =
-    " i32.const " ++ show n
-    
-genExpr (Var x) env =
-    case lookup x env of
-        Just idx -> " local.get $" ++ x
-        Nothing -> error $ "Variable not found: " ++ x
+-- translate_statement :: IR_Statement -> WASM_Function
+-- translate_statement (FuncDef fname rtype params _ body _) = do
+--     let initialState = sc_initial_cgstate $ params
+-}

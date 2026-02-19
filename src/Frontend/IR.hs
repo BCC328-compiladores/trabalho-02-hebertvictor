@@ -122,7 +122,7 @@ data IR_Type =
     
     -- Generics
     TypeGeneric Identifier |
-
+    
     -- @TODO やはり、あった方がいい!
     -- parsing doesn't get us that, it
     -- is actually get in the semantical analysis.
