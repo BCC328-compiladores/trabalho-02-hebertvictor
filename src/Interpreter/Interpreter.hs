@@ -497,6 +497,7 @@ is_essentially_void TypeVoid = True
 is_essentially_void (TypeArray b _) = is_essentially_void b
 is_essentially_void _ = False
 
+
 -- Interprets a command, and returns whether the result is returned, 
 -- and the associated computed value.
 ic_interpret_command :: IR_LocatedCommand -> InterpreterContext (Bool, Value)
@@ -604,8 +605,8 @@ ic_interpret_command (LC (Print _exp) _) = do
         ValueFloat x    -> ic_print $ "FLOAT: " ++ show x
         ValueBool x     -> ic_print $ "BOOL: " ++ show x
         ValueString x   -> ic_print $ "STRING: " ++ show x
-        ValueUnknown    -> undefined
-        _               -> undefined
+        ValueUnknown    -> ic_raise $ undefined
+        _               -> ic_raise $ undefined
 
     ic_pm_write (VarAccess "@rc" VarAccessNothing) (ValueInt 0)
     non_return_command $ (pure lvalue)
@@ -843,7 +844,18 @@ ic_interpret_expression (ExpFCall fname params) = do
 
                 _                       -> ic_raise $ "Invalid function " ++ show fname -- fim da linha zz
 
-ic_interpret_expression (ExpFCall_Implicit fcall_exp params) = do ic_raise "ExpFCall_Implicit NYI"
+ic_interpret_expression (ExpFCall_Implicit lambda_exp params) = do
+    erro "inadmissível"
+
+    case lambda_exp of
+        ExpLambda _ _ _ _ -> do
+            return $ ()
+
+        _ -> do
+            erro "inadmissível"
+            return $ ()
+
+    return (ValueUnknown, ReferênciaNão)
 
 
 ic_interpret_expression (ExpStructInstance sname exps) = do
@@ -872,9 +884,24 @@ ic_interpret_expression (ExpNew t) = do
     v <- to_value t
     return $ (v, ReferênciaNão)
 
-ic_interpret_expression (ExpLambda rtype params captures cmds) = do ic_raise "Lambda not yet implemented."
-ic_interpret_expression (ExpFunctionReference sname) = do ic_raise "Lambda not yet implemented."
+ic_interpret_expression (ExpLambda rtype params captures cmds) = do ic_raise "Don't exists. Lambda not yet implemented."
+
+ic_interpret_expression (ExpFunctionReference sname) = do
+    -- tem que fazer nada kk
+    return $ (ValueFunction sname, ReferênciaNão)
     
+    {-
+    st      <- ic_get_st
+    case Map.lookup sname st of
+        Just f@(FuncDef _ _ _ _ _ _) -> do
+            (v, _) <- ic_interpret_function f
+            return $ (v, ReferênciaNão)
+
+        Nothing -> do
+            ic_raise $ "Invalid function reference!"
+            return $ (ValueUnknown, ReferênciaNão)
+     -}    
+
 
 ic_interpret_binary_operation :: IR_Expression -> IR_Expression -> (Value -> Value -> Value) -> InterpreterContext (Value, Reference)
 ic_interpret_binary_operation e1 e2 op  = do
@@ -882,3 +909,5 @@ ic_interpret_binary_operation e1 e2 op  = do
     (v2, _) <- ic_interpret_expression e2
     return $ (v1 `op` v2, ReferênciaNão) 
 
+
+erro = error

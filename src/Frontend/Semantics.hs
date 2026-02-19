@@ -467,10 +467,12 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
 
     sc_set_pos pos
     
-    (exp', exp_type)    <- verify_expression exp
+    (exp', _exp_type)   <- verify_expression exp
     vtype'              <- verify_type vtype
+    
+    exp_type <- verify_type _exp_type
 
-    exp_type <- verify_type exp_type
+    --sc_raise $ "EXP_TYPE: " ++ pretty_sl exp_type ++ ", VTYPE: " ++ pretty_sl vtype'
 
     if type_match vtype' exp_type then
         -- ok, expected type.
@@ -483,6 +485,7 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
         -- and the type is generic, then the generic can be solved...
         if is_generic vtype' && (not . is_generic) exp_type then do
             return $ ()
+
         else do
             return $ ()
 
@@ -518,7 +521,7 @@ verify_command (LC (Assignment varaccess exp) pos) = do
 
     (varaccess', access_type) <- verify_access varaccess
     (exp', exp_type) <- verify_expression exp
-
+    
     if type_match exp_type access_type then do
         -- then the types either couldn't be decided or they do match correctly.
         return $ ()
@@ -1132,14 +1135,15 @@ verify_expression exp@(ExpNew t)                        = do
             sc_raise $ "Allocating non-array type " ++ pretty_sl t  ++ " is meaningless"
             return $ (exp, NoType)
 
-verify_expression exp@(ExpFCall_Implicit fcall_exp args) = do
-    let rexp = reduce_expression fcall_exp
-
+verify_expression exp@(ExpFCall_Implicit lambda_exp args) = do
+    let rexp = reduce_expression lambda_exp
+    
     -- well, the expression MUST be a lambda...
     -- no questions asked.
     case rexp of
-        ExpLambda rtype param captures cmds -> do
+        lambda@(ExpLambda rtype param captures cmds) -> do
             
+            {-
             verified_args <- mapM verify_expression args
             let args' = fst <$> verified_args
             let arg_types = snd <$> verified_args
@@ -1149,6 +1153,13 @@ verify_expression exp@(ExpFCall_Implicit fcall_exp args) = do
             verify_fcall "lambda" arg_types param_types rtype'
 
             return $ (ExpFCall_Implicit rexp args', rtype')
+            -}
+
+            (lambda_ref, t) <- verify_expression lambda
+            
+            case lambda_ref of
+                ExpFunctionReference fname -> do
+                    verify_expression (ExpFCall fname args)
 
         _ -> do
             sc_raise $ "Instant evaluation of non-lambda expression: " ++ pretty_sl exp
@@ -1185,7 +1196,9 @@ verify_expression exp@(ExpLambda rtype vars captures _) = do
 verify_expression exp@(ExpFunctionReference sname) = do
     st <- sc_get_st
     case Map.lookup sname st of
-        Just (FuncDef _ rtype _ _ _ _) -> return $ (exp, rtype)
+        Just f@(FuncDef _ _ _ _ _ _) -> do
+            return $ (exp, function_type f)
+
         Nothing -> do
             sc_raise $ "INTERNAL: INVALID LIFTED LAMBDA"
             return $ (exp, NoType)
@@ -1407,7 +1420,8 @@ reduce_expression (ExpArrayInstancing exps)                         = ExpArrayIn
 
 reduce_expression (ExpFCall_Implicit exp args)                      = ExpFCall_Implicit (reduce_expression exp) $ reduce_expression <$> args
 
--- @TODO reduce expression of lambda expression require an equivalent, mutually recursive, reduce_command...
+reduce_expression (ExpLambda t vars ids cmds)                       = ExpLambda t vars ids (reduce_command <$> cmds) 
+
 
 -- everything else won't be reduced.
 reduce_expression exp = exp
@@ -1425,6 +1439,18 @@ reduce_bop constructor e1 e2 =
     in  if ((is_literal r1 || c1) && (is_literal r2 || c2)) then reduce_expression result
         else result 
 
+
+reduce_command :: IR_LocatedCommand -> IR_LocatedCommand
+reduce_command (LC (VarDef vardecl exp) pos)        = LC (VarDef vardecl (reduce_expression exp)) pos
+reduce_command (LC (Assignment varaccess exp) pos)  = LC (Assignment varaccess (reduce_expression exp)) pos
+reduce_command (LC (Return exp) pos)                = LC (Return (reduce_expression exp)) pos
+reduce_command (LC (If exp cmds1 cmds2) pos)        = LC (If (reduce_expression exp) (reduce_command <$> cmds1) (reduce_command <$> cmds2)) pos
+reduce_command (LC (While exp cmds) pos)            = LC (While (reduce_expression exp) (reduce_command <$> cmds)) pos
+reduce_command (LC (For cmd1 exp cmd2 cmds) pos)    = LC (For (reduce_command cmd1) (reduce_expression exp) (reduce_command cmd2) (reduce_command <$> cmds)) pos
+reduce_command (LC (CmdExpression exp) pos)         = LC (CmdExpression exp) pos
+reduce_command (LC (Print exp) pos)                 = LC (Print exp) pos
+reduce_command (LC (Scan exp) pos)                  = LC (Print exp) pos
+reduce_command (LC (CmdList cmds) pos)              = LC (CmdList (reduce_command <$> cmds)) pos
 
 
 is_literal :: IR_Expression -> Bool

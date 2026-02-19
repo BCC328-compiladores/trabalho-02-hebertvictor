@@ -127,7 +127,7 @@ data IR_Type =
     -- parsing doesn't get us that, it
     -- is actually get in the semantical analysis.
     TypeStruct Identifier
-
+    
     deriving (Eq, Show, Read)
 
 
@@ -219,7 +219,7 @@ data IR_Expression =
 
     -- Memory allocation.
     ExpNew IR_Type |
-
+    
     -- Lambda.
     ExpLambda IR_Type [IR_Var] [Identifier] [IR_LocatedCommand] |
     ExpFunctionReference Identifier

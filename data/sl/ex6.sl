@@ -16,7 +16,7 @@ func main(void) {
     };
     
     print(
-        eval (lambda x : int returns int { return x + 1; }) <- (1, 2, 3)
+        eval (lambda x, y, z : int returns int { return x + y + z + 1; }) <- (1, 2, 3)
     );
 
     print(

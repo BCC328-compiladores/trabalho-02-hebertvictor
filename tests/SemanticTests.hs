@@ -171,7 +171,7 @@ lambda_specs = describe "Lambda" $ do
             ("Calling function \"f\" with wrong number of arguments (7 out of 6)",          (52, 30)),
             ("Invalid argument #1 on function \"f\" call: expected int, yet, argument is float",          (55, 35))
             ]
-
+    
     {-
     it "Lifting (rp1.sl)" $ do
         verified <- verify_src "data/sl/sa/rp1.sl"
