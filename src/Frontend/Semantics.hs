@@ -336,7 +336,7 @@ verify_statement s@(StructDef sname fields pos) = do
 
     fields' <- mapM (verify_field sname) fields
     let s' = (StructDef sname fields' pos)
-
+    
     -- updating the symbol table.
     st <- sc_get_st
     sc_set_st $ Map.insert sname s' st

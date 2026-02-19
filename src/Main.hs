@@ -81,7 +81,6 @@ main = do
                 putStrLn "Tokens:"
                 mapM_ print tk_list -- Print's list elements one per line
 
-
     let parsed = if opt_parser options || opt_pretty options || opt_interpret options || opt_semantics options
                  then parse_sl file_content
                  else Right undefined
