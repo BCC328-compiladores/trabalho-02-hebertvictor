@@ -195,6 +195,6 @@ global_specs = describe "General program structure" $ do
         1 `shouldBe` 1
 
     it "Data-structure example (ex7.sl)" $ do
-        verified <- verify_src "data/sl/ex7.sl"
+        verified <- verify_src "data/sl/sa/ep10.sl"
         putStrLn $ pretty_sl verified
         1 `shouldBe` 1

@@ -18,6 +18,7 @@ import Frontend.Error ( Error(Error), ErrorType(ExecutionError) )
 import Frontend.Token
 import Frontend.IR
 import Frontend.Semantics
+import Frontend.Pretty
 import Frontend.Parser ( parse_sl )
 
 import Data.Map
@@ -50,9 +51,10 @@ interpret p__ = do
             --print err
             return $ Left err
 
-        Right (_, st) -> do
+        Right (verified_program, st) -> do
             start_time <- getCurrentTime
-            
+
+            --putStrLn $ pretty_sl verified_program
             result <- interpreter_context_run ic_interpret_program (base_is st)
 
             end_time <- getCurrentTime
@@ -303,6 +305,7 @@ ic_interpret_function (FuncDef fname rtype param gtypes body _) args = do
     pm <- ic_get_pm
     
     ic_set_pm $ base_pm
+    ic_set_gm $ Map.empty
 
     -- loading the function context (arguments).
     ic_function_load_args args param fname
@@ -407,20 +410,20 @@ overload_generic vtype (TypeGeneric g) = do
         Just t  -> 
             case tipo_compatível vtype t of
                 True    -> return $ ()
-                False   -> ic_raise $ "Couldn't overload generic `" ++ g ++ "` (determined " ++ show t ++ ")" 
+                False   -> ic_raise $ "Couldn't overload generic `" ++ g ++ "` (determined " ++ show t ++ ")" ++ show vtype 
 overload_generic _ _ = return $ ()
 
 
 -- só pra ver se o Value concorda com o IR_Type...
 é_tipo_válido :: Value -> IR_Type -> Bool
-é_tipo_válido (ValueInt _) TypeInt                  = True
-é_tipo_válido (ValueFloat _) TypeFloat              = True
-é_tipo_válido (ValueString _) TypeString            = True
-é_tipo_válido (ValueBool _) TypeBool                = True
-é_tipo_válido (ValueArray b) (TypeArray t _)        = é_tipo_válido (b !! 0) t
-é_tipo_válido (ValueFunction _) (TypeFunction _ _)  = True
-é_tipo_válido (ValueStruct sname1 _) (TypeStruct sname2) = sname1 == sname2
-é_tipo_válido _ _                                   = False
+é_tipo_válido (ValueInt _) TypeInt                          = True
+é_tipo_válido (ValueFloat _) TypeFloat                      = True
+é_tipo_válido (ValueString _) TypeString                    = True
+é_tipo_válido (ValueBool _) TypeBool                        = True
+é_tipo_válido (ValueArray b) (TypeArray t _)                = é_tipo_válido (b !! 0) t
+é_tipo_válido (ValueFunction _) (TypeFunction _ _)          = True
+é_tipo_válido (ValueStruct sname1 _) (TypeStruct sname2)    = sname1 == sname2
+é_tipo_válido _ _                                           = False
 
 tipo_compatível :: IR_Type -> IR_Type -> Bool
 tipo_compatível a b = a == b
@@ -489,6 +492,10 @@ ic_interpret_command_list (cmd:cmds) = do
         True    -> do
             return $ (True, v)
 
+is_essentially_void :: IR_Type -> Bool
+is_essentially_void TypeVoid = True
+is_essentially_void (TypeArray b _) = is_essentially_void b
+is_essentially_void _ = False
 
 -- Interprets a command, and returns whether the result is returned, 
 -- and the associated computed value.
@@ -508,7 +515,7 @@ ic_interpret_command (LC (VarDef (VarDecl vname vtype) vexp) _) = do
                 ic_set_pm (Map.insert vname value' pm)
                 return $ (False, value')
 
-            else if vtype == TypeVoid then do 
+            else if is_essentially_void vtype then do 
                 pm <- ic_get_pm
                 ic_set_pm (Map.insert vname value pm)
                 return $ (False, value)
@@ -553,7 +560,7 @@ ic_interpret_command (LC (If _exp cmds1 cmds2) _) = do
 ic_interpret_command w@(LC (While _exp cmds) _) = do
 
     (lvalue, _) <- ic_interpret_expression _exp
-    --ic_io $ putStrLn $ "=== Cabeça do While: " ++ show lvalue
+    --ic_io $ putStrLn $ "=== Cabeça do While: " ++ (pretty_sl _exp) ++ " ==> " ++ show lvalue
 
     case lvalue of 
         ValueBool b -> do
@@ -575,7 +582,7 @@ ic_interpret_command for@(LC (For init_cmd _exp it_exp cmds) _) = do
 
     -- once the initial command is executed, that is essentially a while with an extra command at the end.
     (_, v) <- ic_interpret_command $ LC (While _exp (cmds ++ [it_exp])) $ lc_pos init_cmd
-
+    
     -- erasing variables created inside the block.
     -- specially important for 'for', since usually init_cmd goes with variable def.
     pm' <- ic_get_pm

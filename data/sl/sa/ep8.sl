@@ -24,7 +24,7 @@ forall a b . func map(f: (a) -> b, l : a[]) : b[]
     {
         n[i] = f(l[i]);
     }
-
+    
     return n;
 }
 

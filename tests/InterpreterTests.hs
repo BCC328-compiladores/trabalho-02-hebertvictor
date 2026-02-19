@@ -99,7 +99,7 @@ sample_specs = describe "Sample programs" $ do
             "FLOAT: 0.0",
             "FLOAT: 1.0"
             ])
-
+    
     it "ex7.sl" $ do
         result <- asd "data/sl/ex7.sl"
         result `shouldBe` (ValueInt 0, ["INT: 1", "INT: 4"])

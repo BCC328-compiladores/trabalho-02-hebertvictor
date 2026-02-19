@@ -946,7 +946,7 @@ verify_type t@(TypeGeneric g) = do
         Just TypeVoid -> 
             -- type not registered yet.
             return $ TypeVoid
-
+        
         Nothing -> do
             -- worse yet: not even a generic.
             -- then it is probably a struct.
@@ -985,7 +985,7 @@ verify_expression :: IR_Expression -> SemanticalContext (IR_Expression, IR_Type)
 
 verify_expression exp@(ExpFCall sname args) = do
     --sc_raise $ ">>> VERIFY_EXPRESSION TYPE CHECK FCALL "
-
+    
     verified <- mapM verify_expression args
     let args' = fst <$> verified
     let types' = snd <$> verified
@@ -1068,10 +1068,10 @@ verify_expression exp@(ExpGeq e1 e2)        = verify_expression_relational ExpGe
 verify_expression exp@(ExpLt e1 e2)         = verify_expression_relational ExpLt e1 e2  exp
 verify_expression exp@(ExpLeq e1 e2)        = verify_expression_relational ExpLeq e1 e2 exp
 
-verify_expression exp@(ExpLIncr e)          = verify_expression e -- @TODO
-verify_expression exp@(ExpRIncr e)          = verify_expression e -- @TODO
-verify_expression exp@(ExpLDecr e)          = verify_expression e -- @TODO
-verify_expression exp@(ExpRDecr e)          = verify_expression e -- @TODO
+verify_expression exp@(ExpLIncr e)          = __verify_incr_exp e ExpLIncr "Left increment"
+verify_expression exp@(ExpRIncr e)          = __verify_incr_exp e ExpRIncr "Right increment"
+verify_expression exp@(ExpLDecr e)          = __verify_incr_exp e ExpLDecr "Left decrement"
+verify_expression exp@(ExpRDecr e)          = __verify_incr_exp e ExpRDecr "Right decrement"
 
 verify_expression exp@(ExpVariable va)                  = do
     (access, vtype) <- verify_access va
@@ -1191,6 +1191,18 @@ verify_expression exp@(ExpFunctionReference sname) = do
             return $ (exp, NoType)
 
 
+__verify_incr_exp :: IR_Expression -> (IR_Expression -> IR_Expression) -> String -> SemanticalContext (IR_Expression, IR_Type)
+__verify_incr_exp e constructor msg = do
+    (e', e_type) <- verify_expression e
+
+    if e_type /= TypeInt then do
+        sc_raise $ msg ++ " on non-int eval. expression: " ++ pretty_sl e ++ " (" ++ pretty_sl e_type ++ ")"
+        return $ (ExpNothing, NoType)
+
+    else do
+        return (constructor e', TypeInt)
+
+
 verify_expression_closed_bop :: String -> IR_Expression -> IR_Expression -> (IR_Expression -> IR_Expression -> IR_Expression) -> SemanticalContext (IR_Expression, IR_Type)
 verify_expression_closed_bop bop_str e1 e2 constructor = do
     (e1', t1) <- verify_expression (reduce_expression e1)
@@ -1265,7 +1277,8 @@ __verify_parameter sname param_type (exp_type, n) = do
 -- Tell if two tipes are semantically compatible.
 -- That is, if they're non-strictly equal or one of them is of TypeVoid.
 type_match :: IR_Type -> IR_Type -> Bool
-type_match t1 t2 = t1 `type_eq` t2 || t1 == TypeVoid || t2 == TypeVoid || t1 == NoType || t2 == NoType
+type_match (TypeArray b1 _) (TypeArray b2 _) = type_match b1 b2
+type_match t1 t2 = t1 `type_eq` t2 || t1 == TypeVoid || t2 == TypeVoid || t1 == NoType || t2 == NoType || is_generic t1 || is_generic t2
 -- @TODO TypeVoid represents that the type couldn't be evaluated, for now!
 
 function_rtype_match :: IR_Type -> IR_Type -> Bool

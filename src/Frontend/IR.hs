@@ -106,7 +106,7 @@ data IR_Type =
     -- value used for erroing in the semantical analysis...
     -- won't be used as a return of neither of the parser nor semantical analyzer...
     NoType      |
-
+    
     -- Standard Types
     TypeVoid    |
     TypeBool    |

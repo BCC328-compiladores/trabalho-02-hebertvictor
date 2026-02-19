@@ -12,7 +12,7 @@ func id(x) {
 forall a b . func map (f: (a) -> b, v: a[]) : b[] {
     let result = new b[v.size];
 
-    for (i = 0; i < v.size; ++ i) {
+    for (let i : int = 0; i < v.size; ++ i) {
         result[i] = f(v[i]);
     }
 
@@ -39,8 +39,8 @@ func main(void) : void {
     // map~
     let asd : int[] = [ 3, 1, 4, 1, 5 ];
     let new_asd : float[] = map(a_real_nothing, asd);
-
-    for (i : int = 0; i < new_asd.size; ++ i) {
-        print(new_asd[i]);
+    
+    for (let j : int = 0; j < new_asd.size; ++ j) {
+        print(new_asd[j]);
     }
 }

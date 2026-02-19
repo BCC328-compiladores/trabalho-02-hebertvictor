@@ -21,4 +21,4 @@ main = hspec $ do
     --ParserTests.tests
     --PrettyTests.tests
     SemanticTests.tests
-    --InterpreterTests.tests
+    InterpreterTests.tests
