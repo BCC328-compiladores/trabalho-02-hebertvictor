@@ -24,6 +24,7 @@ data CompilerOptions = Options {
     opt_lexer :: Bool,
     opt_parser :: Bool,
     opt_pretty :: Bool,
+    opt_semantics :: Bool,
     opt_interpret :: Bool
 }
 
@@ -32,6 +33,7 @@ parse_options args = Options {
     opt_lexer  = elem "-l" args || elem "--lexer" args,
     opt_parser = elem "-p" args || elem "--parser" args,
     opt_pretty = elem "-pt" args || elem "--pretty" args,
+    opt_semantics = elem "-s" args || elem "--semantics" args,
     opt_interpret = elem "-i" args || elem "--interpret" args
 }
 
@@ -79,41 +81,38 @@ main = do
                 putStrLn "Tokens:"
                 mapM_ print tk_list -- Print's list elements one per line
 
-    let parsed = if opt_parser options || opt_pretty options || opt_interpret options
+
+    let parsed = if opt_parser options || opt_pretty options || opt_interpret options || opt_semantics options
                  then parse_sl file_content
                  else Right undefined
 
-    when (opt_parser options) $ do
-        case parsed of
-            Left error_str ->
-                putStrLn $ "Parser Error: " ++ pretty_sl error_str
+    case parsed of
+        Left error_str -> putStrLn $ "Parser Error: " ++ pretty_sl error_str
 
-            Right ir -> do
+        Right ir_program -> do
+            when (opt_parser options) $ do
                 putStrLn "Program IR:"
                 -- print ir 
                 -- putStrLn "\n----------------------------------\n"
-                putStrLn $ pretty_sl_tree ir
+                putStrLn $ pretty_sl_tree ir_program
 
-    when (opt_pretty options) $ do
-        case parsed of
-            Left error_str ->
-                putStrLn $ "Parser Error: " ++ pretty_sl error_str
-
-            Right ir_program -> do
+            when (opt_pretty options) $ do
                 putStrLn "Program:"
                 putStrLn $ pretty_sl ir_program
 
-    when (opt_interpret options) $ do
-        case parsed of
-            Left error_str ->
-                putStrLn $ "Parser Error: " ++ pretty_sl error_str
+            when (opt_semantics options) $ do
+                let verified = sl_verify ir_program
 
-            Right ir_program -> do
+                case verified of
+                    Left s -> putStrLn $ "Error: " ++ pretty_sl s
+                    Right (p', _) -> putStrLn $ pretty_sl p'
+                        
+                
+            when (opt_interpret options) $ do
                 let verified = sl_verify ir_program
 
                 case verified of 
-                    Left s -> do
-                        putStrLn $ "Error: " ++ pretty_sl s
+                    Left s -> putStrLn $ "Error: " ++ pretty_sl s
 
                     Right (p', _) -> do 
                         result <- interpret p'

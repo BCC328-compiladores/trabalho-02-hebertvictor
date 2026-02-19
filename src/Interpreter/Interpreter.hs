@@ -690,9 +690,7 @@ ic_pm_write :: IR_VarAccess -> Value -> InterpreterContext Value
 ic_pm_write (VarAccess vname next_access) value = do
     pm <- ic_get_pm
     case Map.lookup vname pm of
-        Nothing -> do
-            ic_print $ "UUUUUUAUUUUUUUUU"
-            ic_raise $ "Undef access to " ++ show vname
+        Nothing -> ic_raise $ "Undef access to " ++ show vname
         Just x  -> do
             --ic_io $ putStrLn $ "SETTING " ++ show vname ++ "(" ++ show x ++ ") = " ++ show value
             
@@ -820,8 +818,36 @@ ic_interpret_expression (ExpRIncr e)             = do
             -- rincr return lvalue is the older one.
             return $ (v, r)
 
-ic_interpret_expression (ExpLDecr e)             = do ic_raise "dd" -- Shouldn't happen?? Semantics should do Decr -> Incr?
-ic_interpret_expression (ExpRDecr e)             = do ic_raise "dd"
+ic_interpret_expression (ExpLDecr e)             = do 
+    -- overall value doesn't matter; just the reference...
+    (_, r) <- ic_interpret_expression e
+
+    case r of 
+        ReferênciaNão           -> ic_raise $ "L-decrement in lvalue"
+        Referência varaccess    -> do
+            -- for which the value is taken from the variable,
+            v <- ic_pm_read varaccess
+
+            -- incremented,
+            let v' = v ||-|| (ValueInt 1)
+
+            -- and the written again;
+            ic_pm_write varaccess v'
+
+            -- lincr return lvalue is the newer one.
+            return $ (v', r)
+
+ic_interpret_expression (ExpRDecr e)             = do
+    (_, r) <- ic_interpret_expression e
+
+    case r of 
+        ReferênciaNão           -> ic_raise $ "R-increment in rvalue"
+        Referência varaccess    -> do
+            v <- ic_pm_read varaccess
+            ic_pm_write varaccess (v ||-|| (ValueInt 1))
+
+            -- rincr return lvalue is the older one.
+            return $ (v, r)
 
 
 ic_interpret_expression (ExpFCall fname params) = do
