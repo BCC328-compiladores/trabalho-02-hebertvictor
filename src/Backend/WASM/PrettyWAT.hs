@@ -6,8 +6,9 @@
 module Backend.WASM.PrettyWAT where
 
 import Frontend.Pretty
+import Frontend.Parser (parse_sl)
 import Frontend.Semantics
-import qualified Frontend.IR as IR
+import Frontend.IR
 import Frontend.Error
 
 import Backend.WASM.WAT_Codegen
@@ -16,15 +17,15 @@ import Data.Map
 
 
 -- Parsing the program from a file directly.
-_parse :: String -> IO IR.IR_Program
+_parse :: String -> IO IR_Program
 _parse textcode = do
-    let asd = Data.Either.fromRight (IR.IR_Program []) $ parse_sl textcode
+    let asd = Data.Either.fromRight (Program []) $ parse_sl textcode
     return $ asd
 
 _fdoidera :: String -> IO SymbolTable
 _fdoidera textcode = do
     parsed <- _parse textcode
-    let asd = Data.Either.fromRight Data.Map.empty $ snd (sl_verify parsed)
+    let asd = snd $ Data.Either.fromRight (Program [], Data.Map.empty) $ (sl_verify parsed)
     return $ asd
 
 asd = _fdoidera "func add(x: int, y: int) : int { return x + y; }"
@@ -155,7 +156,7 @@ instance Pretty WASM_Instruction where
     
     -- Function & scope.
     pretty (Call sname)         = pc_tell "call $" >> pretty sname
-    pretty Return               = pc_tell "return"
+    pretty WReturn              = pc_tell "return"
     pretty (Block label instructions) = do
         pc_newline -- <- só pra organizar né pai...
         pc_tell "(block $"
@@ -179,7 +180,7 @@ instance Pretty WASM_Instruction where
         pretty label
         pc_newline -- (pra organizar)
 
-    pretty (If result if_instructions else_instructions) = do
+    pretty (WIf result if_instructions else_instructions) = do
         pc_tell "(if"
 
         case result of 
@@ -274,7 +275,7 @@ example_if =
             [ LocalGet "x"           -- parâmetro
             , I32_Const 0
             , I32_GtS                -- x > 0
-            , If (Just I32)         -- tipo do resultado do if
+            , WIf (Just I32)         -- tipo do resultado do if
                 [ I32_Const 1 ]      -- then
                 [ I32_Const 0 ]      -- else
             ]

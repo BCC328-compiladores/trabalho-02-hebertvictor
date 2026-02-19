@@ -76,6 +76,8 @@ executable HarmonicalVortex
         Frontend.PrettyTree
         Frontend.Value
         Frontend.Semantics
+        Backend.WASM.WAT_Codegen
+        Backend.WASM.PrettyWAT
         Interpreter.Interpreter
 
     -- LANGUAGE extensions used by modules in this package.
@@ -124,6 +126,8 @@ test-suite data-tests
         ParserTests
         PrettyTests
         SemanticTests
+        Backend.WASM.WAT_Codegen
+        Backend.WASM.PrettyWAT
         InterpreterTests
 
     build-depends:

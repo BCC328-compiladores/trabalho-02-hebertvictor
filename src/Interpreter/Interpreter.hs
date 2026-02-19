@@ -139,7 +139,7 @@ ic_get_pm = IC $ \state ->
 
 
 ic_set_pm :: ProgramMemory -> InterpreterContext ()
-ic_set_pos pm = IC $ \state -> ((), satate { is_pm = pm })
+ic_set_pm pm = IC $ \state -> return $ Right ((), state { is_pm = pm })
 
 
 ic_get_gm :: InterpreterContext GenericsMap 
@@ -147,7 +147,7 @@ ic_get_gm = IC $ \state ->
     return $ Right (is_gm state, state)
 
 ic_set_gm :: GenericsMap -> InterpreterContext ()
-ic_set_pos gm = IC $ \state -> ((), satate { is_gm = gm })
+ic_set_gm gm = IC $ \state -> return $ Right ((), state { is_gm = gm })
 
 
 ic_get_pos :: InterpreterContext SrcPos
@@ -155,7 +155,7 @@ ic_get_pos = IC $ \state ->
     return $ Right (is_src_pos state, state)
 
 ic_set_pos :: SrcPos -> InterpreterContext ()
-ic_set_pos _pos = IC $ \state -> ((), satate { is_src_pos = _pos })
+ic_set_pos _pos = IC $ \state -> return $ Right ((), state { is_src_pos = _pos })
 
 
 ic_raise :: String -> InterpreterContext v

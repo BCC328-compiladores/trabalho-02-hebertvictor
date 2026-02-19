@@ -265,14 +265,14 @@ data WASM_Instruction =
 
     -- Function-related.
     Call        Identifier |
-    Return | 
+    WReturn | 
 
     -- Scope.
     Block       Identifier [WASM_Instruction] | 
     Loop        Identifier [WASM_Instruction] | 
 
     -- Control-flux.
-    If          (Maybe WASM_Type) [WASM_Instruction] [WASM_Instruction] |
+    WIf       (Maybe WASM_Type) [WASM_Instruction] [WASM_Instruction] |
     Br          Identifier |
     BrIf        Identifier
     
