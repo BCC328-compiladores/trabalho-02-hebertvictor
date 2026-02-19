@@ -6,10 +6,28 @@
 module Backend.WASM.PrettyWAT where
 
 import Frontend.Pretty
+import Frontend.Semantics
 import qualified Frontend.IR as IR
 import Frontend.Error
 
 import Backend.WASM.WAT_Codegen
+import Data.Either
+import Data.Map
+
+
+-- Parsing the program from a file directly.
+_parse :: String -> IO IR.IR_Program
+_parse textcode = do
+    let asd = Data.Either.fromRight (IR.IR_Program []) $ parse_sl textcode
+    return $ asd
+
+_fdoidera :: String -> IO SymbolTable
+_fdoidera textcode = do
+    parsed <- _parse textcode
+    let asd = Data.Either.fromRight Data.Map.empty $ snd (sl_verify parsed)
+    return $ asd
+
+asd = _fdoidera "func add(x: int, y: int) : int { return x + y; }"
 
 
 {-  Exemplo mínimo:
@@ -122,7 +140,7 @@ instance Pretty WASM_Instruction where
     pretty I32_GeS              = pretty I32 >> pc_tell ".ge_s"
     pretty I32_LeU              = pretty I32 >> pc_tell".le_u"
     pretty I32_GeU              = pretty I32 >> pc_tell ".ge_u"
-    
+
     -- Stack control.
     pretty (LocalDecl sname wtype)= do 
         pc_tell "(local $"

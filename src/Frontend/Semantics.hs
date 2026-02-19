@@ -263,22 +263,22 @@ sc_get_cmap = SC $ \state -> (ss_cmap state, state, [])
 
 
 sc_set_st :: SymbolTable -> SemanticalContext ()
-sc_set_st st = SC $ \(SemanticalState _ gm vm fc cmap pos) -> ((), SemanticalState st gm vm fc cmap　pos, [])
+sc_set_st st = SC $ \state -> ((), state { ss_st = st }, [])
 
 sc_set_gm :: GenericsMap -> SemanticalContext ()
-sc_set_gm gm = SC $ \(SemanticalState st _ vm fc cmap pos) -> ((), SemanticalState st gm vm fc cmap　pos, [])
+sc_set_gm gm = SC $ \state -> ((), state { ss_gm = gm }, [])
 
 sc_set_vm :: VariableMap -> SemanticalContext ()
-sc_set_vm vm = SC $ \(SemanticalState st gm _ fc cmap pos) -> ((), SemanticalState st gm vm fc cmap　pos, [])
+sc_set_vm vm = SC $ \state -> ((), state { ss_vm = vm }, [])
 
 sc_set_fc :: FunctionContext -> SemanticalContext ()
-sc_set_fc fc = SC $ \(SemanticalState st gm vm _ cmap pos) -> ((), SemanticalState st gm vm fc cmap pos, [])
+sc_set_fc fc = SC $ \state -> ((), state { ss_fc = fc }, [])
 
 sc_set_cmap :: CMap -> SemanticalContext ()
-sc_set_cmap cmap = SC $ \(SemanticalState st gm vm fc _ pos) -> ((), SemanticalState st gm vm fc cmap pos, [])
+sc_set_cmap cmap = SC $ \state -> ((), state { ss_cmap = cmap }, [])
 
 sc_set_pos :: SrcPos -> SemanticalContext ()
-sc_set_pos pos = SC $ \(SemanticalState st gm vm fc cmap _) -> ((), SemanticalState st gm vm fc cmap pos, [])
+sc_set_pos pos = SC $ \state -> ((), state { ss_src_pos = pos }, [])
 
 
 sc_raise :: String -> SemanticalContext ()
@@ -297,9 +297,9 @@ sl_verify p = do -- from either
 
     -- creating the symbol table.
     st <- sl_create_st p
-
+    
     let (r, final_state, errs) = semantical_analysis_context_run (verify_program p) (SemanticalState st Map.empty Map.empty default_fc Map.empty (SrcPos (-1, -1)))
-
+    
     case errs of
         []  -> Right $ (r, ss_st final_state)
         _   -> Left $ MultipleErrors errs

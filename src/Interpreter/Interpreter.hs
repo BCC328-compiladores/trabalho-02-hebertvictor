@@ -139,17 +139,15 @@ ic_get_pm = IC $ \state ->
 
 
 ic_set_pm :: ProgramMemory -> InterpreterContext ()
-ic_set_pm pm = IC $ \(InterpreterState st _ gm _log _pos) ->
-    return $ Right ((), InterpreterState st pm gm _log _pos)
+ic_set_pos pm = IC $ \state -> ((), satate { is_pm = pm })
 
 
-ic_get_gm :: InterpreterContext GenericsMap
+ic_get_gm :: InterpreterContext GenericsMap 
 ic_get_gm = IC $ \state -> 
     return $ Right (is_gm state, state)
 
 ic_set_gm :: GenericsMap -> InterpreterContext ()
-ic_set_gm gm = IC $ \(InterpreterState st pm _ _log _pos) ->
-    return $ Right ((), InterpreterState st pm gm _log _pos)
+ic_set_pos gm = IC $ \state -> ((), satate { is_gm = gm })
 
 
 ic_get_pos :: InterpreterContext SrcPos
@@ -157,8 +155,7 @@ ic_get_pos = IC $ \state ->
     return $ Right (is_src_pos state, state)
 
 ic_set_pos :: SrcPos -> InterpreterContext ()
-ic_set_pos _pos = IC $ \(InterpreterState st pm gm _log _) ->
-    return $ Right ((), InterpreterState st pm gm _log _pos)
+ic_set_pos _pos = IC $ \state -> ((), satate { is_src_pos = _pos })
 
 
 ic_raise :: String -> InterpreterContext v
@@ -313,7 +310,7 @@ ic_interpret_function (FuncDef fname rtype param gtypes body _pos) args = do
     -- saving older program state...    
     gm <- ic_get_gm
     pm <- ic_get_pm
-    
+
     ic_set_pos $ _pos
     ic_set_pm $ base_pm
     ic_set_gm $ Map.empty
@@ -633,7 +630,9 @@ ic_interpret_command (LC (Print _exp) _pos) = do
     ic_pm_write (VarAccess "@rc" VarAccessNothing) (ValueInt 0)
     non_return_command $ (pure lvalue)
 
-ic_interpret_command (LC (Scan _exp) _) = ic_raise "scan NYI"
+ic_interpret_command (LC (Scan _exp) _pos) = do
+    ic_set_pos $ _pos
+    ic_raise "scan NYI"
 
 ic_print :: String -> InterpreterContext ()
 ic_print string = 

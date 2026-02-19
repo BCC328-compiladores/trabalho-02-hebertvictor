@@ -4,7 +4,7 @@
     @details    ~
 */
 
-func sla(void) : void {
+func main(void) : void {
 
     for (let i : int = 0; i < 100; i = i + 1) {
         let k : int = 0;
@@ -22,7 +22,6 @@ func sla(void) : void {
         }
     }
     
-
     let y: int = 5;
     let z: int = 8;
 
