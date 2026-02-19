@@ -151,6 +151,16 @@ ic_set_gm :: GenericsMap -> InterpreterContext ()
 ic_set_gm gm = IC $ \(InterpreterState st pm _ _log _pos) ->
     return $ Right ((), InterpreterState st pm gm _log _pos)
 
+
+ic_get_pos :: InterpreterContext SrcPos
+ic_get_pos = IC $ \state ->
+    return $ Right (is_src_pos state, state)
+
+ic_set_pos :: SrcPos -> InterpreterContext ()
+ic_set_pos _pos = IC $ \(InterpreterState st pm gm _log _) ->
+    return $ Right ((), InterpreterState st pm gm _log _pos)
+
+
 ic_raise :: String -> InterpreterContext v
 ic_raise error_msg_ = IC $ \state -> do
     --_ <- return $ Right $ ic_print $ error_msg_
@@ -296,7 +306,7 @@ st_get_main st =
 
 -- takes in the IR function description and a list of values (its args).
 ic_interpret_function :: IR_Statement -> [Value] -> InterpreterContext (Value, ProgramMemory)
-ic_interpret_function (FuncDef fname rtype param gtypes body _) args = do
+ic_interpret_function (FuncDef fname rtype param gtypes body _pos) args = do
     --ic_io $ putStrLn $ "=== Executando função:"
     --ic_io $ putStrLn $ pretty_sl f
 
@@ -304,6 +314,7 @@ ic_interpret_function (FuncDef fname rtype param gtypes body _) args = do
     gm <- ic_get_gm
     pm <- ic_get_pm
     
+    ic_set_pos $ _pos
     ic_set_pm $ base_pm
     ic_set_gm $ Map.empty
 
@@ -501,9 +512,11 @@ is_essentially_void _ = False
 -- Interprets a command, and returns whether the result is returned, 
 -- and the associated computed value.
 ic_interpret_command :: IR_LocatedCommand -> InterpreterContext (Bool, Value)
-ic_interpret_command (LC (VarDef (VarDecl vname vtype) vexp) _) = do
+ic_interpret_command (LC (VarDef (VarDecl vname vtype) vexp) _pos) = do
     --ic_io $ putStrLn $ "=== Definindo variável `" ++ vname ++ "` (" ++ show vtype ++ ")"
     
+    ic_set_pos $ _pos
+
     (value, _) <- ic_interpret_expression vexp
     case é_tipo_válido value vtype of
         False   -> do
@@ -530,7 +543,8 @@ ic_interpret_command (LC (VarDef (VarDecl vname vtype) vexp) _) = do
             return $ (False, value)
 
 
-ic_interpret_command (LC (Return _exp) _) = do
+ic_interpret_command (LC (Return _exp) _pos) = do
+    ic_set_pos $ _pos
 
     (lvalue, _) <- ic_interpret_expression _exp
 
@@ -538,16 +552,20 @@ ic_interpret_command (LC (Return _exp) _) = do
     return $ (True, lvalue)
 
 
-ic_interpret_command (LC (Assignment varaccess _exp) _) = do
+ic_interpret_command (LC (Assignment varaccess _exp) _pos) = do
     -- for instance, for assignment, the reference doesn't matter.
     -- it may be important if pointers turn out to be a language's feature thought.
+    ic_set_pos $ _pos
+
     (lvalue, _) <- ic_interpret_expression _exp
     
     --ic_io $ putStrLn $ "=== Atribuindo " ++ pretty_sl exp ++ "(" ++ show lvalue ++ ") para " ++ pretty_sl varaccess
     non_return_command $ ic_pm_write varaccess lvalue
 
 
-ic_interpret_command (LC (If _exp cmds1 cmds2) _) = do
+ic_interpret_command (LC (If _exp cmds1 cmds2) _pos) = do
+    ic_set_pos $ _pos
+
     -- rvalue is irrelavant.
     (lvalue, _) <- ic_interpret_expression _exp
 
@@ -558,7 +576,8 @@ ic_interpret_command (LC (If _exp cmds1 cmds2) _) = do
         _ -> ic_raise $ "Non-boolean type on if command: " ++ show lvalue
 
 
-ic_interpret_command w@(LC (While _exp cmds) _) = do
+ic_interpret_command w@(LC (While _exp cmds) _pos) = do
+    ic_set_pos $ _pos
 
     (lvalue, _) <- ic_interpret_expression _exp
     --ic_io $ putStrLn $ "=== Cabeça do While: " ++ (pretty_sl _exp) ++ " ==> " ++ show lvalue
@@ -571,10 +590,11 @@ ic_interpret_command w@(LC (While _exp cmds) _) = do
 
         _ -> ic_raise $ "Non-boolean type on While command: " ++ show lvalue
 
-ic_interpret_command for@(LC (For init_cmd _exp it_exp cmds) _) = do
+ic_interpret_command for@(LC (For init_cmd _exp it_exp cmds) _pos) = do
     ic_raise $ "EU NÃO INTERPRETO FOR"
 
     -- saving state.
+    ic_set_pos $ _pos
     pm <- ic_get_pm
 
     (_, _) <- case lc_cmd init_cmd of 
@@ -592,12 +612,14 @@ ic_interpret_command for@(LC (For init_cmd _exp it_exp cmds) _) = do
     return $ (False, v)
 
         
-ic_interpret_command (LC (CmdExpression _exp) _) = do
+ic_interpret_command (LC (CmdExpression _exp) _pos) = do
+    ic_set_pos $ _pos
     (lvalue, _) <- ic_interpret_expression _exp
     non_return_command $ (pure lvalue)
         
 
-ic_interpret_command (LC (Print _exp) _) = do
+ic_interpret_command (LC (Print _exp) _pos) = do
+    ic_set_pos $ _pos
     (lvalue, rvalue) <- ic_interpret_expression _exp
     
     case lvalue of

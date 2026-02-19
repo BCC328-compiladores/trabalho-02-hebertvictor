@@ -56,7 +56,7 @@ data IR_Command =
     VarDef IR_Var IR_Expression |                   -- Let x = E;
     Assignment IR_VarAccess IR_Expression |         -- x = ...
     Return IR_Expression |                          -- return E;
-
+    
     -- Actually, for the control-flux, it can be packed into constructor.
     -- In that case, every if has an else; it can be empty or with more 'ifs' thought.
     If IR_Expression [IR_LocatedCommand] [IR_LocatedCommand] |

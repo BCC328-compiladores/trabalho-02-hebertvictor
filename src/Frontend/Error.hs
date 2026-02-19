@@ -16,7 +16,8 @@ data ErrorType =
     LexicalError    |
     SyntaxError     |
     SemanticalError | 
-    ExecutionError
+    ExecutionError | 
+    CodegenError
     deriving (Eq, Show, Read)
 
 
