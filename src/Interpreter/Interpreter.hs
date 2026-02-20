@@ -48,9 +48,9 @@ interpret :: IR_Program -> IO InterpreterResult
 interpret p__ = do
     case sl_verify p__ of
         Left err -> do
-            --print err
+            putStrLn $ pretty_sl err
             return $ Left err
-
+        
         Right (verified_program, st) -> do
             start_time <- getCurrentTime
 
@@ -58,7 +58,7 @@ interpret p__ = do
             result <- interpreter_context_run ic_interpret_program (base_is st)
 
             end_time <- getCurrentTime
-
+            
             putStrLn $ "End. Elapsed: " ++ show (diffUTCTime end_time start_time) ++ "."
             
             case result of

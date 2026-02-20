@@ -64,7 +64,7 @@ type StructMap = Map Identifier CompiledStruct
 
 data CodegenState = 
     CodegenState {
-        cs_st           :: SymbolTable,            
+        cs_st           :: SymbolTable,         
         cs_sm           :: StructMap,            
         cs_locals       :: LocalsMap,           -- defines the current local enviroment in the WASM context.
         cs_next_local   :: Int,                 -- counter (index where to allocate next local)
@@ -77,7 +77,6 @@ data CodegenState =
 newtype CodegenContext v = CC {
     codegen_context_run :: CodegenState -> Either Error (v, CodegenState)
 }
-
 
 
 instance Functor CodegenContext where
@@ -218,27 +217,44 @@ data WASM_Function =
     deriving (Eq, Show)
 
 
-data WASM_Type = I32 | I64 | F32 | F64 
+data WASM_Type = I32 | I64 | F32 | F64 |
+    Structure [WASM_Type]
     deriving (Eq, Show)
 
 
 -- PURE.
 to_wasm_type :: IR_Type -> Maybe WASM_Type
-to_wasm_type TypeInt   = Just I32
-to_wasm_type TypeBool  = Just I32
-to_wasm_type TypeFloat = Just F32
-to_wasm_type TypeVoid  = Nothing     -- Nothing will mean no type
+to_wasm_type TypeInt            = Just I32
+to_wasm_type TypeBool           = Just I32
+to_wasm_type TypeFloat          = Just F32
+to_wasm_type TypeVoid           = Nothing     -- Nothing will mean no type
+to_wasm_type _                  = Nothing
 
 
 -- DIFFERS FROM WHAT IT IS INSIDE THE CONTEXT ONLY.
 wasm_type :: IR_Type -> CodegenContext WASM_Type
 wasm_type the_type = do
-    case to_wasm_type the_type of
-        Nothing -> do
-            raise $ "Can't map type " ++ pretty_sl the_type ++ " to WASM"
-            return $ F64
+    case the_type of
+        TypeStruct sname -> do
+            
+            st <- cc_get_st
+            case Map.lookup sname st of
+                Just (StructDef _ fields pos)   -> do
+                    let field_types = (\(VarDecl _ t) -> t) <$> fields
+                    wfield_types <- mapM wasm_type field_types
+                    return $ Structure wfield_types
+                    
+                _ -> do
+                    raise $ "Can't map type " ++ pretty_sl the_type ++ " to WASM" ++ show the_type
+                    return $ F64
 
-        Just t  -> return $ t
+        _ -> do
+            case to_wasm_type the_type of
+                Nothing -> do
+                    raise $ "Can't map type " ++ pretty_sl the_type ++ " to WASM" ++ show the_type
+                    return $ F64
+
+                Just t  -> return $ t
 
 
 
@@ -266,7 +282,7 @@ data WASM_Instruction =
     -- Function-related.
     Call        Identifier |
     WReturn | 
-
+    
     -- Scope.
     Block       Identifier [WASM_Instruction] | 
     Loop        Identifier [WASM_Instruction] | 

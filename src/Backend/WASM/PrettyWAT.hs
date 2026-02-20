@@ -28,7 +28,9 @@ _fdoidera textcode = do
     let asd = snd $ Data.Either.fromRight (Program [], Data.Map.empty) $ (sl_verify parsed)
     return $ asd
 
-asd = _fdoidera "func add(x: int, y: int) : int { return x + y; }"
+asd = do 
+    st <- _fdoidera "func add(x: int, y: int) : int { return x + y; }"
+    putStrLn $ pretty_sl $ sl_to_wat st
 
 
 {-  Exemplo mínimo:
