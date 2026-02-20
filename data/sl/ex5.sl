@@ -35,7 +35,7 @@ func main(void) : void {
     print(id(5.0));
     print(id(5));
     print(id("olá"));
-
+    
     // map~
     let asd : int[] = [ 3, 1, 4, 1, 5 ];
     let new_asd : float[] = map(a_real_nothing, asd);

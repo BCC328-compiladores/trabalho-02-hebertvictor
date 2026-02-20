@@ -148,7 +148,7 @@ Statement : -- high-level definitions (function / structure).
     } |
 
     -- standard function definition.
-    FUNC IDENTIFIER '(' ParameterList ')' OptionalTypeSpec '{' CommandList '}'
+    FUNC IDENTIFIER '(' ParameterList ')' OptionalTypeSpec2 '{' CommandList '}'
     {   -- `F`.
         FuncDef {
             symbol_name         = $2,
@@ -161,7 +161,7 @@ Statement : -- high-level definitions (function / structure).
     } |
 
     -- generic function definition.
-    FORALL GenericList '.' FUNC IDENTIFIER '(' ParameterList ')' OptionalTypeSpec '{' CommandList '}'
+    FORALL GenericList '.' FUNC IDENTIFIER '(' ParameterList ')' OptionalTypeSpec2 '{' CommandList '}'
     {   -- `F`.
         FuncDef {
             symbol_name         = $5,
@@ -385,6 +385,12 @@ OptionalTypeSpec :: { IR_Type } -- `T_S^*`.
 OptionalTypeSpec :
     TypeSpec    { $1 } |
                 { TypeVoid }
+
+
+OptionalTypeSpec2 :: { IR_Type } -- `T_S^*`.
+OptionalTypeSpec2 :
+    TypeSpec    { $1 } |
+                { NoType }
 
 
 VariableAccess :: { IR_VarAccess }

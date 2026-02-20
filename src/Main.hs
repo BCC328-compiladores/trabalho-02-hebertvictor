@@ -133,7 +133,7 @@ main = do
             when (opt_semantics options) $ do
                 case verified_program of
                     Left err -> putStrLn $ pretty_sl err
-                    Right (p', _) -> putStrLn $ pretty_sl p'
+                    Right (p', st) -> putStrLn $ pretty_sl st
                 
             -- Option Compile (-c)
             when (opt_compile options) $ do

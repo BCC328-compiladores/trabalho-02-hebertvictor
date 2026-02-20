@@ -55,6 +55,7 @@ interpret p__ = do
             start_time <- getCurrentTime
 
             --putStrLn $ pretty_sl verified_program
+            putStrLn $ pretty_sl st
             result <- interpreter_context_run ic_interpret_program (base_is st)
 
             end_time <- getCurrentTime
@@ -303,9 +304,9 @@ st_get_main st =
 
 -- takes in the IR function description and a list of values (its args).
 ic_interpret_function :: IR_Statement -> [Value] -> InterpreterContext (Value, ProgramMemory)
-ic_interpret_function (FuncDef fname rtype param gtypes body _pos) args = do
-    --ic_io $ putStrLn $ "=== Executando função:"
-    --ic_io $ putStrLn $ pretty_sl f
+ic_interpret_function f@(FuncDef fname rtype param gtypes body _pos) args = do
+    ic_io $ putStrLn $ "=== Executando função:"
+    ic_io $ putStrLn $ pretty_sl f
 
     -- saving older program state...    
     gm <- ic_get_gm
