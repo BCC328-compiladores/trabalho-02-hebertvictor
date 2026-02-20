@@ -107,8 +107,11 @@ sl_create_st p = case create_unique_st $ create_multiple_st p of
 
 
 sl_retify :: SymbolTable -> SymbolTable
-sl_retify st = let new_functions filter (\f -> symbol_name f !! 0 /= "#" && function_gtypes g == []) (filter (not . is_struct) Map.toList st)
-                in Map.toList
+sl_retify st = Map.filter new_functions st 
+    where new_functions f = 
+            not $ (not . is_struct $ f) && 
+            (symbol_name f !! 0 /= '#') && 
+            ((function_gtypes f /= []) || (has_param_void f))
 
 
 ---------------------------------
@@ -312,6 +315,10 @@ sl_verify p = do -- from either
 verify_program :: IR_Program -> SemanticalContext IR_Program
 verify_program p@(Program statements) = do
     statements' <- mapM verify_statement statements
+
+    -- retifying
+    st <- sc_get_st
+    sc_set_st $ sl_retify st
 
     -- extending the lambdas statements.
     st <- sc_get_st
@@ -1020,6 +1027,8 @@ monofunctionalize_via_arg (FuncDef sname rtype param gtypes body pos) types = do
 
     let sname' = function_monofization_name sname types
     
+    --raise $ "NOME NOVO: " ++ sname'
+
     if sname' /= sname then do
         st <- sc_get_st
         let new_param = overload_param <$> zip param types
@@ -1055,7 +1064,6 @@ verify_expression exp@(ExpFCall sname args) = do
             sname' <- monofunctionalize_via_arg f types'
             
             st <- sc_get_st
-            raise $ pretty_sl st
             
             let exp' = ExpFCall sname' args'
             let param_types = (\(VarDecl _ t) -> t) <$> param

@@ -306,11 +306,6 @@ compile_structs st = do
     mapM compile_struct struct_statements  
 
 
-is_struct :: IR_Statement -> Bool
-is_struct (StructDef _ _ _) = True
-is_struct _                 = False
-
-
 translate_field :: IR_Var -> CodegenContext (Identifier, WASM_Type)
 translate_field (VarDecl s vtype) = do
     vtype' <- wasm_type vtype

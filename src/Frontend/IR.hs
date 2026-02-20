@@ -50,6 +50,15 @@ data IR_Statement =
     
     deriving (Eq, Show, Read)
 
+-- 
+is_struct :: IR_Statement -> Bool
+is_struct (StructDef _ _ _) = True
+is_struct _                 = False
+
+has_param_void :: IR_Statement -> Bool
+has_param_void (FuncDef _ _ param _ _ _) = 
+    any (\(VarDecl _ t) -> t == TypeVoid) param
+has_param_void _ = False
 
 data IR_Command =
 
@@ -152,6 +161,7 @@ is_generic :: IR_Type -> Bool
 is_generic (TypeGeneric _) = True
 is_generic _ = False
 
+
 -- diz se eventualmente o tipo tem algo genérico...
 have_generic :: IR_Type -> Bool
 have_generic (TypeGeneric _)        = True
@@ -160,7 +170,6 @@ have_generic (TypeGeneric _)        = True
 have_generic (TypeArray t _)        = have_generic t
 have_generic (TypeFunction ts tr)   = or (have_generic <$> ts) || have_generic tr
 have_generic _                      = False
-
 
 -- verifies if the type is not of NoType...
 is_type_invalid :: IR_Type -> Bool

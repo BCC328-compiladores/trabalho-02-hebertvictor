@@ -7,8 +7,8 @@ module Backend.WASM.PrettyWAT where
 
 import Frontend.Pretty
 import Frontend.Parser (parse_sl)
-import Frontend.Semantics
-import Frontend.IR
+import Frontend.Semantics ( SymbolTable, sl_verify )
+import Frontend.IR ( IR_Program(..) )
 import Frontend.Error
 
 import Backend.WASM.WAT_Codegen
