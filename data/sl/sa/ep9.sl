@@ -43,8 +43,7 @@ func not_so_ok_behavior(void) {
     print(
         eval (lambda x : int returns int { return x + 1; }) <- (1, 2, 3)
     );
-
-
+    
     // invalid args, by cardinality...
     print(f());
     print(f(1));

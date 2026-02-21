@@ -108,13 +108,22 @@ sl_create_st p = case create_unique_st $ create_multiple_st p of
 
 sl_retify :: SymbolTable -> SymbolTable
 sl_retify st = Map.map retify_rtype $ Map.filter new_functions st 
-    where   new_functions f = 
-                not $ (not . is_struct $ f) && 
-                (symbol_name f !! 0 /= '#') && 
-                ((function_gtypes f /= []) || (has_param_void f))
+    where   new_functions f = not $ --- tira tudo que,
+                (not . is_struct $ f) &&  -- não é struct (é função),
+                
+                -- não é a main,                
+                (symbol_name f /= "main") &&
+
+                -- e não é monofizada, tem genérico ou tem parâmetros "desconhecidos".
+                ((not $ is_prefix __mangle_prefix (symbol_name f)) || (function_gtypes f /= []) || (has_param_void f))
 
             retify_rtype f@(FuncDef _ NoType _ _ _ _) = f { function_rtype = TypeVoid }
             retify_rtype s = s
+
+is_prefix :: String -> String -> Bool
+is_prefix prefixo coisa 
+    | length coisa < length prefixo     = False
+    | otherwise                         = take (length prefixo) coisa == prefixo
 
 
 base_vmap :: VariableMap
@@ -325,11 +334,19 @@ verify_program p@(Program statements) = do
 
     -- retifying
     st <- sc_get_st
+
+    -- verificando se tem a main...
+    {-
+    if any \(f -> is_function f && symbol_name f == "main") statements' then
+        return ()
+    else raise "Undefined main."
+    -}
+
     sc_set_st $ sl_retify st
 
     -- extending the lambdas statements.
     st <- sc_get_st
-
+    
     let lambdas = filter is_lambda (snd <$> Map.toList st) where
         is_lambda stmt = case stmt of       
             FuncDef sname _ _ _ _ _     -> length sname > 7 && (take 7 sname == "@LAMBDA") -- "@LAMBDA"
@@ -374,8 +391,7 @@ verify_function f@(FuncDef sname rtype param gtypes body pos) context_vm = do
     -- 2 - concordance with return expression and function's rtype;
     -- 3 - what more?
     --raise $ ">>> VERIFY FUNCTION " ++ show sname
-
-    --raise $ "VERIFICANDO FUNCÇÃO " ++ show sname
+    
     -- saving older state...
     gm <- sc_get_gm
     vm <- sc_get_vm
@@ -387,6 +403,9 @@ verify_function f@(FuncDef sname rtype param gtypes body pos) context_vm = do
     fc <- sc_get_fc
     sc_set_fc $ FC f False (fc_lambda_count fc) (fc_context_level fc)
     fc_next_level
+
+    fc1231232 <- sc_get_fc
+    --raise $ "1BAHIA: " ++ (show $ fc_context_level fc)
 
     mapM_ (\g -> load_generic g TypeVoid True) gtypes -- loading generics.
     mapM_ load_variable param -- loading the variables into memory.
@@ -410,17 +429,18 @@ verify_function f@(FuncDef sname rtype param gtypes body pos) context_vm = do
     if length gtypes /= length real_generics then do
         raise $ show gtypes ++ " ===> " ++ show real_generics
     else return $ ()
-
+    
     -- resetting analysis state...
     sc_set_gm gm
     sc_set_vm vm
 
     sc_set_fc $ fc
-    fc_previous_level
 
     let new_function = FuncDef sname verified_rtype param real_generics commands'' pos
     st <- sc_get_st
     sc_set_st $ st_insert new_function st
+
+    --raise $ ">>> VERIFY FUNCTION RESULT: " ++ pretty_sl new_function
 
     return $ new_function
 
@@ -441,6 +461,7 @@ verify_function_final_state = do
     -- does this function is rtyped yet doesn't have an explicit return at the end?
     case rtype of
         TypeVoid    -> return $ () -- then a return isn't expected.
+        NoType      -> return $ () -- fazer oq né pai...
         _           -> do
             fc <- sc_get_fc
             if fc_has_return fc then return $ ()
@@ -465,10 +486,11 @@ verify_closure_final_state = do
             
             fc <- sc_get_fc
             
+            --raise $ "Variable: " ++ vname ++ " Accesses: " ++ (show access_count) ++ "Context_Level: " ++ show level
             if access_count < 1 && level == fc_context_level fc then do
                 let sname   = (symbol_name . fc_statement) fc
 
-                raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype ++") is not being used on function " ++ show sname -- ++ " [" ++ show level ++ ", " ++ (show $ fc_context_level fc) ++ "]"
+                raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype ++") is not being used on function " ++ (show $ unmangled_function_id sname) -- ++ " [" ++ show level ++ ", " ++ (show $ fc_context_level fc) ++ "]"
 
             else return $ ()
 
@@ -510,7 +532,7 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
     exp_type <- verify_type _exp_type
 
     --raise $ "EXP_TYPE: " ++ pretty_sl exp_type ++ ", VTYPE: " ++ pretty_sl vtype'
-
+    
     if type_match vtype' exp_type then
         -- ok, expected type.
         return $ ()
@@ -519,11 +541,12 @@ verify_command (LC (VarDef vdecl@(VarDecl vname vtype) exp) pos) = do
         
         -- the idea being: if the expression is of concrete type and 
         -- and the type is generic, then the generic can be solved...
-        overloaded <- overload_generic vtype' exp_type
+        overloaded <- attempt_overload_generic (vtype', exp_type)
+        --raise $ "OVERLOADED: " ++ show overloaded
 
-        if (not . is_generic) vtype' || overloaded then do
+        if overloaded then do
             return $ ()
-
+        
         else do
             raise $ "Variable " ++ show vname ++ " (" ++ pretty_sl vtype' ++ ") is set to an expression that evaluates to " ++ pretty_sl exp_type  
 
@@ -874,14 +897,14 @@ verify_access access@(VarAccess vname next_access) = do
         Nothing -> do
             -- is it possibly a function then?
             -- (functional behavior...)
-
+            
             st <- sc_get_st
             case Map.lookup vname st of
-                Just f      -> do 
+                Just f      -> do
                     return $ (access, function_type f)
                 _           -> do
                     fc <- sc_get_fc
-                    raise $ "Variable " ++ show vname ++ " is not defined" ++ (symbol_name $ fc_statement fc) ++ (pretty_sl $ fc_statement fc)
+                    raise $ "Variable " ++ show vname ++ " is not defined"
                     return $ (access, NoType)
 
         Just (VariableInfo _ vtype access_count def_pos vref level)  -> do
@@ -1108,11 +1131,11 @@ __mangle_prefix = "__MANGLED_"
 
 
 mangle_function_id :: Identifier -> [IR_Type] -> Identifier
-mangle_function_id identifier types = filter (/= ' ') $ __mangle_prefix ++ identifier ++ "@" ++ intercalate "_" (pretty_sl <$> types)
+mangle_function_id identifier types = filter (/= ' ') $ __mangle_prefix ++ identifier ++ "#" ++ intercalate "_" (pretty_sl <$> types)
 
 unmangled_function_id :: Identifier -> Identifier
 unmangled_function_id identifier =  let stripped = fromMaybe identifier (stripPrefix __mangle_prefix identifier)
-                                    in takeWhile (/= '@') stripped
+                                    in takeWhile (/= '#') stripped
 
 
 -- @TODO For instance, just works if the generics can be solved on the function call (via parameters!)
@@ -1120,62 +1143,97 @@ unmangled_function_id identifier =  let stripped = fromMaybe identifier (stripPr
 monofunctionalize_via_signature :: IR_Statement -> [IR_Type] -> SemanticalContext IR_Statement
 monofunctionalize_via_signature f@(FuncDef sname rtype param gtypes body pos) arg_types = do
     
-    -- let new_param = overload_param <$> zip param types
-    sc_set_pos pos
 
-    ------------ stack
+    -- let new_param = overload_param <$> zip param types
+
+
+    -- carregando os genéricos via os parâmetros e tipo de retorno...
+    let param_types = (\(VarDecl _ t) -> t) <$> param
+    
+    -------------------------- stack
     gm <- sc_get_gm
     sc_set_gm $ Map.empty
-    
-    -- carregando os genéricos via os parâmetros e tipo de retorno...
-    --mapM_ (\(g, t) -> load_generic g t True) $ zip gtypes types -- loading generics.
-    let param_types = (\(VarDecl _ t) -> t) <$> param
-    --raise $ "ARG TYPES: " ++ show arg_types
+
     mapM_ attempt_overload_generic $ zip param_types arg_types
 
-    gm' <- sc_get_gm
-    let unsolveds = filter (not . __is_generic_unsolved) gtypes where
-        __is_generic_unsolved g = 
-            case Map.lookup g gm' of
-                Nothing         -> False
-                Just TypeVoid   -> False
-                Just _          -> True
+    types <- mapM verify_type2 $ zip param_types arg_types 
+    let new_sname       = mangle_function_id sname types
 
-    if length unsolveds > 0 then do
-        raise $ "Monofunctionalization of " ++ show sname ++ " is not possible due to the unsolved generics " ++ show unsolveds --  ++ (show $ Map.lookup (unsolveds !! 0) gm')
-        return $ f
+    st <- sc_get_st
+    case Map.lookup new_sname st of
+        Nothing -> do
+            old_pos <- sc_get_pos
+            sc_set_pos pos
+            
+            gm' <- sc_get_gm
+            let unsolveds = filter (not . __is_generic_unsolved) gtypes where
+                __is_generic_unsolved g = 
+                    case Map.lookup g gm' of
+                        Nothing         -> False
+                        Just TypeVoid   -> False
+                        Just _          -> True
 
-    else do
+            if length unsolveds > 0 then do
+                raise $ "Monofunctionalization of " ++ show sname ++ " is not possible due to the unsolved generics " ++ show unsolveds --  ++ (show $ Map.lookup (unsolveds !! 0) gm')
+                sc_set_pos old_pos
+                return $ f
 
-        types <- mapM verify_type2 $ zip param_types arg_types 
+            else do
+                let new_params      = (\((VarDecl s _), t) -> VarDecl s t) <$> zip param types
+                let new_function    = FuncDef new_sname rtype new_params gtypes body pos
 
-        let new_sname       = mangle_function_id sname types
-        let new_params      = (\((VarDecl s _), t) -> VarDecl s t) <$> zip param types
-        let new_function    = FuncDef new_sname rtype new_params [] body pos
+                st <- sc_get_st
+                sc_set_st $ st_insert new_function st
 
-        --raise $ "==> monofuncionalizando o caralho do " ++ show sname'
-        new_function <- verify_function new_function base_vmap
-        --raise $ (symbol_name new_function) ++ " H=> " ++ (pretty_sl $ function_rtype new_function)
+                let new_function    = FuncDef new_sname rtype new_params [] body pos
 
-        sc_set_gm gm
-        -----------------------
+                --raise $ "==> monofuncionalizando o caralho do " ++ show sname'
+                new_function <- verify_function new_function base_vmap
+                --raise $ (symbol_name new_function) ++ " H=> " ++ (pretty_sl $ function_rtype new_function)
 
-        --raise $ "<== monofuncionalizdo o caralho do " ++ show sname'
+                sc_set_gm gm
+                --------------------------
 
-        st <- sc_get_st
-        sc_set_st $ st_insert new_function st
+                --raise $ "<== monofuncionalizdo o caralho do " ++ show sname'
 
-        return $ new_function
+                st <- sc_get_st
+                sc_set_st $ st_insert new_function st
 
-        where
-            -- RESPEITA O PRIMEIRO TIPO.
-            verify_type2 :: (IR_Type, IR_Type) -> SemanticalContext IR_Type
-            verify_type2 (base_type, possible_new_type) = do
-                t' <- verify_type base_type
+                sc_set_pos old_pos
+                return $ new_function
 
-                case t' of 
-                    TypeVoid    -> return $ possible_new_type
-                    _           -> return $ t'
+        Just f' -> do 
+            sc_set_gm gm
+            return $ f'
+
+    where
+        -- RESPEITA O PRIMEIRO TIPO.
+        verify_type2 :: (IR_Type, IR_Type) -> SemanticalContext IR_Type
+        verify_type2 (base_type, possible_new_type) = do
+            t' <- verify_type base_type
+
+            case t' of 
+                TypeVoid    -> do
+                    if possible_new_type == NoType then do
+                        error $ "VERIFY TYPE2 ERRO1"
+                    else do return $ ()
+                    
+                    return $ possible_new_type
+                    
+                NoType      -> do
+                    if possible_new_type == NoType then do
+                        -- Ok então... deixa passar; provavelmente já deu erro antes.
+                        -- desiste de monofizar.
+                        return $ ()
+
+                    else do
+                        pos <- sc_get_pos
+                        error $ "VERIFY TYPE2 ERRO2" ++ show pos ++ show sname ++ show t' ++ show possible_new_type
+                        
+                    return t'
+                    
+                _           -> return $ t'
+                
 
 
 ---------------------------
@@ -1198,23 +1256,22 @@ verify_expression exp@(ExpFCall sname args) = do
     st <- sc_get_st
     pos <- sc_get_pos
 
+    let fnamefname = show $ unmangled_function_id sname
     case Map.lookup sname st of
         -- ok, it was a function already there...
         Just f@(FuncDef _ rtype param gtypes body pos)  -> do
             newf <- monofunctionalize_via_signature f types'
-            let sname'  = symbol_name newf
-            let rtype   = function_rtype newf
+            let sname'      = symbol_name newf
+            let rtype       = function_rtype newf
 
-            st <- sc_get_st
-            
-            let exp' = ExpFCall sname' args'
+            let exp'        = ExpFCall sname' args'
             let param_types = (\(VarDecl _ t) -> t) <$> param
-
+            
             rtype' <- verify_type rtype
             
-            verify_fcall sname' types' param_types rtype'
+            verify_fcall fnamefname types' param_types rtype'
             return $ (exp', rtype')
-
+        
         Just (StructDef _ _ pos) -> do
             raise $ "Calling struct " ++ show sname ++ " (defined at " ++ pretty_sl pos ++ ") as a function!"
             return $ (exp, NoType)
@@ -1224,31 +1281,58 @@ verify_expression exp@(ExpFCall sname args) = do
             -- then it is probably a local function.
             vm <- sc_get_vm
             case Map.lookup sname vm of
-                Just (VariableInfo _ (TypeFunction param_types rtype) _ _ vref vlevel) -> do
-                    
-                    -- creating dummy access...
-                    verify_access (VarAccess sname VarAccessNothing)
+                Just vinfo@(VariableInfo _ ttt@(TypeFunction param_types rtype) _ _ vref vlevel) -> do
 
                     rtype' <- verify_type rtype
 
                     cmap <- sc_get_cmap
+                    
                     case Map.lookup vref cmap of
                         Just captures -> do
+
                             capture_types <- mapM variable_type captures 
-                            --raise $ show (types' ++ capture_types) ++ " / " ++ show param_types ++ show "; args: " ++ pretty_sl args' ++ show "; types: " ++ pretty_sl types' ++ "; captures: " ++ pretty_sl captures
-                            verify_fcall sname (types' ++ capture_types) param_types rtype'
+                            let novo_argtypes = (types' ++ capture_types)
+                            
+                            (new_sname, rtype', new_type) <- case Map.lookup vref st of
+                                {-
+                                -}
+                                Just f@(FuncDef _ _ _ _ _ _) -> do
+                                    --raise $ "ENTROU:" ++ pretty_sl f
+                                    newf <- monofunctionalize_via_signature f novo_argtypes
+                                    --raise $ "SAIU" ++ pretty_sl newf
+                                    return $ (symbol_name newf, function_rtype newf, function_type newf)
+
+                                _ -> return $ (vref, rtype', ttt)
+
+                            --raise $ show novo_argtypes ++ " / " ++ show param_types ++ show "; args: " ++ pretty_sl args' ++ show "; types: " ++ pretty_sl types' ++ "; captures: " ++ pretty_sl captures
+                            verify_fcall fnamefname novo_argtypes param_types rtype'
 
                             let scoped_args = (\s -> ExpVariable (VarAccess s VarAccessNothing)) <$> captures
                             let exp' = ExpFCall sname (args' ++ scoped_args)
-                            return $ (exp', rtype')
 
+                            -- creating dummy access...
+                            sc_set_vm $ Map.insert sname (vinfo { varstat_ref = new_sname, varstat_type = new_type }) vm
+                            verify_access (VarAccess sname VarAccessNothing)
+                            return $ (exp', rtype')
+    
                         _ -> do
-                            verify_fcall sname types' param_types rtype'
+                            (new_sname, rtype', new_type) <- case Map.lookup vref st of
+                                {-
+                                -}
+                                Just f@(FuncDef _ _ _ _ _ _) -> do
+                                    newf <- monofunctionalize_via_signature f types'
+                                    return $ (symbol_name newf, function_rtype newf, function_type newf)
+
+                                _ -> return $ (vref, rtype', ttt)
+                            verify_fcall fnamefname types' param_types rtype'
+
+                            -- creating dummy access...
+                            verify_access (VarAccess sname VarAccessNothing)
                             return $ (exp, rtype')
 
                 y   -> do
                     -- then the function really doesn't exists whatsoever.
-                    raise $ "Function " ++ show sname ++ " is undefined"
+                    raise $ "Function " ++ (show $ unmangled_function_id sname) ++ " is undefined"
                     -- raise $ show y
                     return $ (exp, NoType)
 
@@ -1472,20 +1556,20 @@ verify_expression_relational constructor e1 e2 exp = do
         return $ (exp, NoType)
 
 
-verify_fcall :: Identifier -> [IR_Type] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
-verify_fcall sname types param_types rtype = do
+verify_fcall :: String -> [IR_Type] -> [IR_Type] -> IR_Type -> SemanticalContext IR_Type
+verify_fcall sname_string types param_types rtype = do
 
     if  length param_types /= length types then do
-        raise $ "Calling function " ++ show sname ++ " with wrong number of arguments (" ++ show (length types) ++ " out of " ++ show (length param_types) ++ ")"
+        raise $ "Calling function " ++ sname_string ++ " with wrong number of arguments (" ++ show (length types) ++ " out of " ++ show (length param_types) ++ ")"
     else return $ ()
     
     -- independently of the # of args...
-    zipWithM_ (__verify_parameter sname) param_types (zip types [1..])
+    zipWithM_ (__verify_parameter sname_string) param_types (zip types [1..])
 
     return $ rtype
 
-__verify_parameter :: Identifier -> IR_Type -> (IR_Type, Int) -> SemanticalContext ()
-__verify_parameter sname param_type (exp_type, n) = do
+__verify_parameter :: String -> IR_Type -> (IR_Type, Int) -> SemanticalContext ()
+__verify_parameter sname_string param_type (exp_type, n) = do
     unsolved <- unsolved_type param_type
     
     if type_match exp_type param_type || unsolved then do
@@ -1493,7 +1577,7 @@ __verify_parameter sname param_type (exp_type, n) = do
         return $ ()
 
     else do 
-        raise $ "Invalid argument #" ++ show n ++ " on function " ++ show sname ++ " call: expected " ++ pretty_sl param_type ++ ", yet, argument is " ++ pretty_sl exp_type
+        raise $ "Invalid argument #" ++ show n ++ " on function " ++ sname_string ++ " call: expected " ++ pretty_sl param_type ++ ", yet, argument is " ++ pretty_sl exp_type
 
 
 -- Tell if two tipes are semantically compatible.
@@ -1526,6 +1610,8 @@ lift_lambda lambda@(ExpLambda rtype vars captures cmds) = do
     let lambda_id = fc_lambda_count fc
     let sname = "@LAMBDA-" ++ show lambda_id
 
+    --raise $ "LIFTING LAMBDA"
+
     -- vira mais um.
     sc_set_fc $ FC (fc_statement fc) (fc_has_return fc) (lambda_id + 1) (fc_context_level fc)
 
@@ -1548,9 +1634,9 @@ lift_lambda lambda@(ExpLambda rtype vars captures cmds) = do
     }
 
     sc_set_st $ st_insert statement st
-    statement' <- verify_function statement captured
-    sc_set_st $ st_insert statement' st
-
+    --statement' <- verify_function statement captured
+    --sc_set_st $ st_insert statement' st
+    
     --raise $ ">>> LIFTED " ++ show sname 
     return $ sname
 

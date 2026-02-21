@@ -311,7 +311,7 @@ ic_interpret_function f@(FuncDef fname rtype param gtypes body _pos) args = do
     -- saving older program state...    
     gm <- ic_get_gm
     pm <- ic_get_pm
-
+    
     ic_set_pos $ _pos
     ic_set_pm $ base_pm
     ic_set_gm $ Map.empty
@@ -767,7 +767,7 @@ ic_interpret_expression (ExpVariable varaccess@(VarAccess vname _)) = do
             st <- ic_get_st
             case Map.lookup vname st of
                 Just (FuncDef _ _ _ _ _ _)  -> return $ ValueFunction vname
-                _                           -> ic_raise $ "NEM VARIÁVEL NEM SÍMBOLO KK"
+                _                           -> ic_raise $ "NEM VARIÁVEL NEM SÍMBOLO KK" ++ pretty_sl varaccess
         _                                   -> ic_pm_read varaccess
 
     --pm <- ic_get_pm
@@ -889,6 +889,7 @@ ic_interpret_expression (ExpFCall fname params) = do
                     case Map.lookup fname' st of
                         Just function@(FuncDef _ _ _ _ _ _) -> do
                             (\(v, _) -> (v, ReferênciaNão)) <$> (ic_interpret_function function largs)
+                        _ -> ic_raise $ "AQUIII: fname' = " ++ fname'
 
                 _                       -> ic_raise $ "Invalid function " ++ show fname -- fim da linha zz
 

@@ -17,6 +17,7 @@ import Frontend.Parser
 import Frontend.Pretty (pretty_sl)
 import Frontend.PrettyTree (pretty_sl_tree)
 import Frontend.Semantics (sl_verify)
+import Backend.PrettyWAT
 import Interpreter.Interpreter
 
 data CompilerOptions = Options {
@@ -142,14 +143,13 @@ main = do
 
                     Right (p', _) -> do
                         -- traslated <- translate_program p'
-                        -- pretty_wat <- pretty_sl traslated
+                        let translated = example_loop
+                        pretty_wat <- pretty_sl traslated
 
                         -- Writing .wat file
-                        -- let wat_filepath = change_extention filepath "wat"
-                        -- writeFile wat_filepath pretty_wat
+                        let wat_filepath = change_extention filepath "wat"
+                        writeFile wat_filepath pretty_wat
 
-                        -- callCommand $ "wat2wasm " ++ wat_filepath
-
-                        callCommand $ "wat2wasm data/sla.wat"
+                        callCommand $ "wat2wasm " ++ wat_filepath
 
     exitSuccess

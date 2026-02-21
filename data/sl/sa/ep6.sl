@@ -28,7 +28,7 @@ func atribuicao_certa(void) : void {
 func atribuicao_errada_1(void) : void { 
     let x : int = 1; 
     let y : float = x; 
-
+    
     x = "chupando" + " uma " + "manga";
     y = 1.57 * "INFINITO";
 }

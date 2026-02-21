@@ -56,7 +56,7 @@ func structs(void)
 {
     let a : Aluno = Aluno{ 5 };
     let b : Aluno = A(5);
-
+    
     Aluno(47, 55, 44);
 }
 

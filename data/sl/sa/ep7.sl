@@ -38,7 +38,7 @@ func vo_accessar_tudo_certo(void) : void {
 
 func vo_accessar_tudo_errado(void) : void {
     let h : B;
-
+    
     // invalid field access.
     print(h.campo);
     print(h.campo_todo);

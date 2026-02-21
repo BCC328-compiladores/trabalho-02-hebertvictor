@@ -77,6 +77,7 @@ sample_specs = describe "Sample programs" $ do
             "BOOL: True",
             "STRING: \"condi\\231\\227o normal\""
             ])
+
     it "ex5.sl" $ do
         result <- asd "data/sl/ex5.sl"
         result `shouldBe` (ValueUnknown, [
@@ -101,7 +102,6 @@ sample_specs = describe "Sample programs" $ do
     it "ex8.sl" $ do
         result <- asd "data/sl/ex8.sl"
         result `shouldBe` (ValueUnknown, ["INT: 23", "INT: 6", "INT: 6"])
-
 
 -------------
 -- Unit tests --

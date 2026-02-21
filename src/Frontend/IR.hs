@@ -55,6 +55,10 @@ is_struct :: IR_Statement -> Bool
 is_struct (StructDef _ _ _) = True
 is_struct _                 = False
 
+is_function :: IR_Statement -> Bool
+is_function (FuncDef _ _ _ _ _ _) = True
+is_function _                     = False
+
 has_param_void :: IR_Statement -> Bool
 has_param_void (FuncDef _ _ param _ _ _) = 
     any (\(VarDecl _ t) -> t == TypeVoid) param
